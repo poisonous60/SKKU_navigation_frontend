@@ -185,6 +185,16 @@ html, body {
   }
 }
 
+.route-input-wrapper {
+  position: relative;
+
+  .autocomplete-dropdown {
+    min-width: 200px;
+    right: auto;
+    left: 0;
+  }
+}
+
 #routeInfo {
   display: flex;
   align-items: center;

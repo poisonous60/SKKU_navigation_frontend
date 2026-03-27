@@ -203,6 +203,51 @@ export function getGeoJson(): GeoJSON.FeatureCollection {
   return { type: 'FeatureCollection', features };
 }
 
+/** Get room centroid by ref */
+export function getRoomCentroid(ref: string): [number, number] | null {
+  for (const level of manifest.levels) {
+    const data = levelDataCache.get(level);
+    if (!data) continue;
+    for (const f of data.rooms.features) {
+      if (f.properties.ref !== ref) continue;
+      if (f.properties._centroid) return f.properties._centroid as [number, number];
+      // fallback: compute from polygon
+      if (f.geometry.type === 'Polygon') {
+        const ring = (f.geometry as GeoJSON.Polygon).coordinates[0];
+        const n = ring.length - 1;
+        let sx = 0, sy = 0;
+        for (let i = 0; i < n; i++) { sx += ring[i][0]; sy += ring[i][1]; }
+        return [sx / n, sy / n];
+      }
+    }
+  }
+  return null;
+}
+
+/** Get room polygon coordinates (outer ring) by ref */
+export function getRoomPolygon(ref: string): number[][] | null {
+  for (const level of manifest.levels) {
+    const data = levelDataCache.get(level);
+    if (!data) continue;
+    for (const f of data.rooms.features) {
+      if (f.properties.ref !== ref) continue;
+      if (f.geometry.type === 'Polygon') {
+        return (f.geometry as GeoJSON.Polygon).coordinates[0];
+      }
+      if (f.geometry.type === 'MultiPolygon') {
+        return (f.geometry as GeoJSON.MultiPolygon).coordinates[0][0];
+      }
+    }
+  }
+  return null;
+}
+
+/** Get which level a room ref belongs to */
+export function getRoomLevel(ref: string): number | null {
+  const room = roomList.find(r => r.ref === ref);
+  return room && room.level.length > 0 ? room.level[0] : null;
+}
+
 /** Search rooms by ref/name */
 export function searchRooms(query: string): RoomListItem[] {
   if (!query.trim()) return [];

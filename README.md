@@ -38,7 +38,7 @@ npm run build  # dist/ 폴더에 번들 생성
 |--------|------|------|
 | 지도 렌더링 | MapLibre GL v4 | 2.5D 뷰, 층별 전환 |
 | 3D 렌더링 | deck.gl v9 | 방 바닥(room_type별 그룹), 벽(BufferGeometry merge), 계단 |
-| 경로 오버레이 | deck.gl PathLayer | A* 결과를 dashed polyline으로 표시 |
+| 경로 오버레이 | deck.gl PathLayer | Dijkstra/A* 결과를 경로 라인으로 표시 (층별 색상 그라데이션) |
 | 360° 비디오 | Three.js SphereGeometry + VideoTexture | Apple Look Around 패턴 (상하 분할) |
 | 백엔드 | Java Spring Boot (별도 레포) | A* 길찾기 |
 | API | `GET /api/route?from={nodeId}&to={nodeId}` | 경로 + 간선 + 클립 목록 |
@@ -60,12 +60,15 @@ npm run build  # dist/ 폴더에 번들 생성
 - [x] 2D/3D 토글
 - [x] QGIS 데이터 파이프라인 (1~2층 완료)
 - [x] 플로팅 룸 라벨
+- [x] **프론트엔드 경로 탐색** — Dijkstra 기반 최단경로 (graph.json 활용, 백엔드 API 교체 대비)
+- [x] **방↔복도 이동 궤적** — room 노드(문 위치 마커) + corridor edge 수직 투영으로 자연스러운 경로
+- [x] **경로 시각화** — deck.gl PathLayer, 층별 색상 그라데이션 (파란→보라), 출발/도착 마커
+- [x] **경로 3D 렌더링** — 3D 모드에서 각 좌표가 해당 층 높이에 정확히 표시, 2D↔3D 전환 시 자동 재렌더링
+- [x] **출발/도착 자동완성** — 방 검색 UI와 동일한 자동완성 드롭다운
+- [x] **room 노드 자동 ref** — 그래프 에디터에서 room 타입 노드 배치 시 가장 가까운 방의 ref 자동 할당
 
 ## 남은 작업
 
-- [ ] **3~5층 GeoJSON 데이터 제작** (QGIS → `geojson_convert/convert.py`)
-- [ ] **백엔드 연동** — Spring Boot A* 길찾기 API 연결
-- [ ] **경로 시각화** — 경로 응답을 지도 위 dashed polyline으로 렌더링
 - [ ] **3~5층 GeoJSON 데이터 제작** (QGIS → `geojson_convert/convert.py`)
 - [ ] **그래프 데이터 완성** — 전 층 노드/간선 생성 (그래프 에디터 활용)
 - [ ] **360° 비디오 촬영 및 클립 연결** — 경로 간선에 비디오 매핑
@@ -83,13 +86,16 @@ npm run build  # dist/ 폴더에 번들 생성
 | `components/geoMap.ts` | MapLibre GL 지도 컨트롤러 |
 | `components/indoorLayer.ts` | 방/벽/계단 3D 렌더링 (핵심, 12KB) |
 | `components/floatingLabels.ts` | 룸 라벨 포지셔닝 |
-| `components/routeOverlay.ts` | 경로 polyline 렌더링 |
+| `components/routeOverlay.ts` | 경로 렌더링 (층별 세그먼트 분할, 3D 높이 적용) |
 | `editor/graphEditor.ts` | 그래프 에디터 메인 컨트롤러 (키보드, 자동저장) |
 | `editor/graphEditorMap.ts` | 에디터 지도 렌더링 (2D 레이어 + 3D SVG/HTML 오버레이) |
 | `editor/graphEditorPanel.ts` | 에디터 UI 패널 (노드·방 속성, 모드 전환) |
 | `editor/graphEditorState.ts` | 에디터 상태 관리 (undo/redo, graph.json 파일 저장) |
 | `editor/graphEditorTypes.ts` | 에디터 타입 정의 (NavNode, NavEdge, Command 등) |
-| `services/backendService.ts` | GeoJSON 로딩 + API 통신 |
+| `services/backendService.ts` | GeoJSON 로딩 + 방 정보 조회 (centroid, polygon, level) |
+| `services/graphService.ts` | 경로 탐색 엔진 (Dijkstra, 문 위치 근사, corridor edge 투영) |
+| `services/apiClient.ts` | 경로 API 클라이언트 (로컬 Dijkstra ↔ 백엔드 A* 전환) |
+| `config/mapConfig.ts` | 지도 인터랙션 + 경로 표시 상수 (한 곳에서 조정) |
 | `models/types.ts` | 핵심 TypeScript 인터페이스 |
 
 ### 데이터 파이프라인

@@ -1,3 +1,9 @@
+
+# Save the Token: Response to English
+When I ask you to korean, you should asnwer me to english. Korean is 7 times expensive then english.
+
+
+
 # Project Instructions
 
 ## Project: SKKU 2.5D Indoor Navigation
@@ -32,6 +38,3 @@ Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude
 - `/browse` — Headless browser for QA and testing
 
 
-### Save the Token: Dont use AGENT
-PLEASE DON'T USE AGNET. They are very very expensive.
-Agent need only the situation which very complicated and multiprocessing needed.

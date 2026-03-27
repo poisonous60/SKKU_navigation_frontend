@@ -2,6 +2,7 @@ import maplibregl from 'maplibre-gl';
 import { ROOM_COLORS } from '../models/types';
 import * as BackendService from '../services/backendService';
 import * as FloatingLabels from './floatingLabels';
+import { MapConfig } from '../config/mapConfig';
 
 /**
  * IndoorLayer — stacked multi-floor 3D indoor rendering
@@ -334,6 +335,7 @@ function addLevelLayers(map: maplibregl.Map, level: number): void {
       id: `${sourceId}-rooms-labels`,
       type: 'symbol',
       source: `${sourceId}-rooms-labelpts`,
+      minzoom: MapConfig.labelMinZoom,
       layout: {
         visibility: 'none',
         'text-field': ['get', 'ref'],

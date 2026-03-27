@@ -269,12 +269,19 @@ function handleModeChange(mode: EditorMode): void {
 function handleMapClick(lngLat: [number, number]): void {
   if (state.mode === 'add-node') {
     const building = State.detectBuilding(lngLat, state.currentLevel);
+    const nodeType = Panel.getAddNodeType();
+
+    // room 타입 노드 → 가장 가까운 방의 ref를 자동 label로 설정
+    const label = nodeType === 'room'
+      ? State.detectRoomRef(lngLat, state.currentLevel)
+      : '';
+
     const node = State.addNode(state, {
       coordinates: lngLat,
       level: state.currentLevel,
       building,
-      type: Panel.getAddNodeType(),
-      label: '',
+      type: nodeType,
+      label,
     });
 
     // Auto-select the new node

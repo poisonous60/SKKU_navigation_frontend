@@ -62,12 +62,21 @@ export function initEditorLayers(map: maplibregl.Map): void {
       'circle-radius': [
         'case',
         ['==', ['get', 'edgeStart'], true], 10,
+        ['==', ['get', 'nodeType'], 'room'], 4,
         7,
       ],
       'circle-color': buildNodeColorExpression(),
-      'circle-stroke-width': 2,
+      'circle-stroke-width': [
+        'case',
+        ['==', ['get', 'nodeType'], 'room'], 1,
+        2,
+      ] as any,
       'circle-stroke-color': '#ffffff',
-      'circle-opacity': 0.9,
+      'circle-opacity': [
+        'case',
+        ['==', ['get', 'nodeType'], 'room'], 0.45,
+        0.9,
+      ] as any,
     },
   });
 
@@ -430,6 +439,7 @@ export function updateFloatingNodeLayer(
     if (isSelected) el.classList.add('selected');
     if (isEdgeStart) el.classList.add('edge-start');
     if (isInactive) el.classList.add('inactive');
+    if (node.type === 'room') el.classList.add('room-node');
 
     const labelText = node.label || node.type;
     const labelEl = document.createElement('span');

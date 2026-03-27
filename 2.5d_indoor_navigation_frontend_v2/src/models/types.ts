@@ -25,6 +25,12 @@ export interface RouteResponse {
   edges: RouteEdge[];
   totalDistance: number;
   estimatedTime: string;
+  /** Pre-computed route coordinates for direct rendering */
+  coordinates?: GeoJSON.Position[];
+  /** Per-coordinate level (parallel to coordinates) */
+  levels?: number[];
+  startLevel?: number;
+  endLevel?: number;
 }
 
 export interface RoomListItem {

@@ -1,5 +1,6 @@
 import maplibregl from 'maplibre-gl';
 import * as BackendService from '../services/backendService';
+import { MapConfig } from '../config/mapConfig';
 
 /**
  * FloatingLabels — HTML div overlay for 3D-positioned room labels
@@ -108,6 +109,13 @@ function updatePositions(): void {
 
   const transform = (map as any).transform;
   const zoom = map.getZoom();
+
+  // Hide all labels when zoomed out beyond threshold
+  if (zoom < MapConfig.labelMinZoom) {
+    for (const label of labels) label.el.style.display = 'none';
+    return;
+  }
+
   const fontSize = interpolateFontSize(zoom);
   const canvas = map.getCanvas();
   const viewW = canvas.clientWidth;

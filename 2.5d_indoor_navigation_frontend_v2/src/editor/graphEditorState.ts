@@ -239,6 +239,46 @@ function calcEdgeWeight(a: NavNode, b: NavNode): number {
   return Math.round(horizontalDist + verticalDist);
 }
 
+// ===== Room Detection =====
+
+/** 좌표가 속한 방의 ref를 반환. 방 안이 아니면 가장 가까운 방의 ref. */
+export function detectRoomRef(coords: [number, number], level: number): string {
+  const [lng, lat] = coords;
+  const levelData = BackendService.getLevelData(level);
+  const rooms = levelData.rooms.features;
+
+  // 1차: point-in-polygon으로 방 안에 있는지 확인
+  for (const f of rooms) {
+    if (!f.properties.ref) continue;
+    if (f.geometry.type !== 'Polygon' && f.geometry.type !== 'MultiPolygon') continue;
+
+    const ring = f.geometry.type === 'Polygon'
+      ? (f.geometry as GeoJSON.Polygon).coordinates[0]
+      : (f.geometry as GeoJSON.MultiPolygon).coordinates[0][0];
+
+    if (pointInPolygon(lng, lat, ring)) {
+      return f.properties.ref;
+    }
+  }
+
+  // 2차: 가장 가까운 방의 centroid 기준
+  let bestRef = '';
+  let bestDist = Infinity;
+  for (const f of rooms) {
+    if (!f.properties.ref) continue;
+    const c = f.properties._centroid as [number, number] | undefined;
+    if (!c) continue;
+    const dx = lng - c[0];
+    const dy = lat - c[1];
+    const d = dx * dx + dy * dy;
+    if (d < bestDist) {
+      bestDist = d;
+      bestRef = f.properties.ref;
+    }
+  }
+  return bestRef;
+}
+
 // ===== Query Helpers =====
 
 export function getNodeCount(state: EditorState): number {

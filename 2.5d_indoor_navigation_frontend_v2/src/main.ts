@@ -4,18 +4,24 @@ import '../scss/main.scss';
 import * as BackendService from './services/backendService';
 import * as GeoMap from './components/geoMap';
 import * as RouteOverlay from './components/routeOverlay';
+import * as GraphService from './services/graphService';
 import { fetchRoute } from './services/apiClient';
 import { ROOM_TYPE_LABELS, RoomListItem } from './models/types';
 import { setupGraphEditor } from './editor/graphEditor';
 
-// ===== App State =====
-let startRoom: string | null = null;
-let endRoom: string | null = null;
+// ===== Route 3D sync =====
+function syncRoute3D(): void {
+  if (!RouteOverlay.hasRoute()) return;
+  RouteOverlay.setIs3D(!GeoMap.isFlatMode());
+}
 
 // ===== Entry Point =====
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    await BackendService.fetchBackendData();
+    await Promise.all([
+      BackendService.fetchBackendData(),
+      GraphService.loadGraph(),
+    ]);
     GeoMap.initMap();
 
     document.addEventListener('mapLoaded', () => {
@@ -67,6 +73,7 @@ function setup3DToggle(): void {
     const is3D = !GeoMap.isFlatMode();
     if (icon) icon.textContent = is3D ? 'map' : '3d_rotation';
     btn.classList.toggle('active', is3D);
+    syncRoute3D();
   });
 }
 
@@ -239,6 +246,10 @@ function setupRouteUI(): void {
     }
   });
 
+  // Autocomplete for start/end inputs
+  if (startInput) setupRouteAutocomplete(startInput, 'startAutocomplete');
+  if (endInput) setupRouteAutocomplete(endInput, 'endAutocomplete');
+
   findBtn?.addEventListener('click', async () => {
     const from = startInput?.value.trim();
     const to = endInput?.value.trim();
@@ -246,7 +257,15 @@ function setupRouteUI(): void {
 
     try {
       const route = await fetchRoute(from, to);
-      showRouteOnMap(route.path);
+
+      if (route.coordinates && route.coordinates.length >= 2) {
+        RouteOverlay.showRoute(
+          route.coordinates,
+          route.levels ?? null,
+          !GeoMap.isFlatMode(),
+        );
+      }
+
       showRouteInfo(route.estimatedTime, route.totalDistance);
     } catch (err: any) {
       console.error('경로 검색 실패:', err);
@@ -262,24 +281,69 @@ function setupRouteUI(): void {
   });
 }
 
-function showRouteOnMap(pathNodeIds: string[]): void {
-  // For now, use mock coordinates along building corridors
-  // TODO: resolve node IDs to actual coordinates via graph.json
-  const geoJson = BackendService.getGeoJson();
-  const coords: GeoJSON.Position[] = [];
+function setupRouteAutocomplete(input: HTMLInputElement, dropdownId: string): void {
+  const dropdown = document.getElementById(dropdownId);
+  if (!dropdown) return;
 
-  for (const nodeId of pathNodeIds) {
-    const feature = geoJson.features.find(f =>
-      f.id === `node/${nodeId}` || f.properties.ref === nodeId
-    );
-    if (feature && feature.geometry.type === 'Point') {
-      coords.push((feature.geometry as GeoJSON.Point).coordinates);
+  let highlightIdx = -1;
+  let currentResults: RoomListItem[] = [];
+
+  input.addEventListener('input', () => {
+    const query = input.value.trim();
+    currentResults = BackendService.searchRooms(query);
+    highlightIdx = -1;
+
+    if (currentResults.length === 0) {
+      dropdown.classList.remove('visible');
+      return;
     }
-  }
 
-  if (coords.length >= 2) {
-    RouteOverlay.showRoute(coords);
-  }
+    dropdown.innerHTML = currentResults.map((r, i) => {
+      const typeLabel = ROOM_TYPE_LABELS[r.roomType] ?? r.roomType;
+      const levelStr = r.level.join(',');
+      return `<div class="autocomplete-item" data-index="${i}">
+        <span class="room-ref">${r.ref}</span>
+        <span class="room-meta">${levelStr}F ${typeLabel}${r.name ? ` · ${r.name}` : ''}</span>
+      </div>`;
+    }).join('');
+
+    dropdown.classList.add('visible');
+
+    dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const idx = parseInt((item as HTMLElement).dataset.index ?? '0');
+        input.value = currentResults[idx].ref;
+        dropdown.classList.remove('visible');
+      });
+    });
+  });
+
+  input.addEventListener('keydown', (e) => {
+    const items = dropdown.querySelectorAll('.autocomplete-item');
+    if (!items.length) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      highlightIdx = Math.min(highlightIdx + 1, items.length - 1);
+      updateHighlight(items, highlightIdx);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      highlightIdx = Math.max(highlightIdx - 1, 0);
+      updateHighlight(items, highlightIdx);
+    } else if (e.key === 'Enter' && highlightIdx >= 0) {
+      e.preventDefault();
+      input.value = currentResults[highlightIdx].ref;
+      dropdown.classList.remove('visible');
+    } else if (e.key === 'Escape') {
+      dropdown.classList.remove('visible');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!(e.target as HTMLElement).closest('.route-input-wrapper')) {
+      dropdown.classList.remove('visible');
+    }
+  });
 }
 
 function showRouteInfo(time: string, distance: number): void {
@@ -312,10 +376,8 @@ function setupRoomClickPopup(): void {
 
   document.getElementById('popupSetStart')?.addEventListener('click', () => {
     if (selectedRef) {
-      startRoom = selectedRef;
       const input = document.getElementById('startRoomInput') as HTMLInputElement;
       if (input) input.value = selectedRef;
-      // Show route inputs
       const routeInputs = document.getElementById('routeInputs');
       if (routeInputs) routeInputs.style.display = 'flex';
     }
@@ -324,7 +386,6 @@ function setupRoomClickPopup(): void {
 
   document.getElementById('popupSetEnd')?.addEventListener('click', () => {
     if (selectedRef) {
-      endRoom = selectedRef;
       const input = document.getElementById('endRoomInput') as HTMLInputElement;
       if (input) input.value = selectedRef;
       const routeInputs = document.getElementById('routeInputs');

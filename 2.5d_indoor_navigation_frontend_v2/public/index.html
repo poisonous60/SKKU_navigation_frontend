@@ -41,8 +41,14 @@
 
         <div class="header-right">
             <div id="routeInputs" style="display:none;">
-                <input type="text" id="startRoomInput" placeholder="출발" autocomplete="off" />
-                <input type="text" id="endRoomInput" placeholder="도착" autocomplete="off" />
+                <div class="route-input-wrapper">
+                    <input type="text" id="startRoomInput" placeholder="출발" autocomplete="off" />
+                    <div id="startAutocomplete" class="autocomplete-dropdown"></div>
+                </div>
+                <div class="route-input-wrapper">
+                    <input type="text" id="endRoomInput" placeholder="도착" autocomplete="off" />
+                    <div id="endAutocomplete" class="autocomplete-dropdown"></div>
+                </div>
                 <button id="findRouteBtn" class="header-icon-btn" title="경로 검색">
                     <span class="material-icons">directions</span>
                 </button>
