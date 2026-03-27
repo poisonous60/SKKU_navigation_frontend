@@ -1,0 +1,467 @@
+import maplibregl from 'maplibre-gl';
+import { ROOM_COLORS } from '../models/types';
+import * as BackendService from '../services/backendService';
+import * as FloatingLabels from './floatingLabels';
+
+/**
+ * IndoorLayer — stacked multi-floor 3D indoor rendering
+ *
+ * 3D mode: ALL floors visible simultaneously, stacked vertically.
+ *   - Active floor: full opacity
+ *   - Floors below active: translucent
+ *   - Floors above active: hidden (so you can look down into the building)
+ *
+ * 2D mode: single floor, flat (pitch 0).
+ */
+
+// ===== Configurable Heights =====
+// Per-floor vertical height (meters in extrusion space)
+export const DEFAULT_FLOOR_HEIGHT = 8; // vertical spacing between floors
+export const ROOM_THICKNESS = 3;       // how tall the room slab is
+const WALL_EXTRA = 4;           // wall extends this much above room top
+const CORRIDOR_THICKNESS = 1.5;
+const STAIRS_THICKNESS = 4;
+
+// Opacity
+const ACTIVE_ROOM_OPACITY = 0.88;
+const INACTIVE_ROOM_OPACITY = 0.3;
+const ACTIVE_WALL_OPACITY = 0.35;
+const INACTIVE_WALL_OPACITY = 0.1;
+const ACTIVE_CORRIDOR_OPACITY = 0.6;
+const INACTIVE_CORRIDOR_OPACITY = 0.15;
+
+// Colors
+const DEFAULT_ROOM_COLOR = '#B0BEC5';
+const CORRIDOR_COLOR = '#E8E8E0';
+const WALL_COLOR = '#9E9E9E';
+const OUTLINE_COLOR = '#546E7A';
+
+// ===== State =====
+let currentLevel = 1;
+let is3DMode = false;
+const addedLevels = new Set<number>();
+
+// Per-building floor height config (can be customized)
+let floorHeights: Map<number, number> = new Map(); // level -> height override
+
+/** Set custom height for a specific floor */
+export function setFloorHeight(level: number, height: number): void {
+  floorHeights.set(level, height);
+}
+
+/** Get the base altitude for a given level */
+export function getLevelBase(level: number): number {
+  const levels = BackendService.getAllLevels(); // [5,4,3,2,1] descending
+  const minLevel = Math.min(...levels);
+  const offset = level - minLevel; // 0-based index from ground
+
+  let base = 0;
+  for (let l = minLevel; l < level; l++) {
+    base += floorHeights.get(l) ?? DEFAULT_FLOOR_HEIGHT;
+  }
+  return base;
+}
+
+// ===== Public API =====
+
+export function addIndoorLayers(map: maplibregl.Map): void {
+  const levels = BackendService.getAllLevels();
+  currentLevel = levels[levels.length - 1] || 1; // start at lowest
+
+  for (const level of levels) {
+    try {
+      addLevelLayers(map, level);
+    } catch (e) {
+      console.warn(`Layer init for level ${level} failed:`, e);
+    }
+  }
+
+  // Initial state: 2D mode, show only current level flat
+  applyVisibility(map);
+}
+
+export function getCurrentLevel(): number {
+  return currentLevel;
+}
+
+/** Switch active level */
+export function setVisibleLevel(map: maplibregl.Map, level: number): void {
+  currentLevel = level;
+  applyVisibility(map);
+}
+
+/** Switch between 2D (flat) and 3D (stacked) */
+export function setExtrusionHeight(map: maplibregl.Map, enable3D: boolean): void {
+  is3DMode = enable3D;
+  applyVisibility(map);
+}
+
+/** Highlight a room by ref */
+export function highlightRoom(map: maplibregl.Map, ref: string | null): void {
+  const levels = BackendService.getAllLevels();
+  for (const l of levels) {
+    const layerId = `floor-${l}-rooms-3d`;
+    if (!map.getLayer(layerId)) continue;
+
+    if (ref) {
+      map.setPaintProperty(layerId, 'fill-extrusion-color', [
+        'case',
+        ['==', ['get', 'ref'], ref],
+        '#FF6F03',
+        buildRoomColorExpression(),
+      ] as any);
+    } else {
+      map.setPaintProperty(layerId, 'fill-extrusion-color', buildRoomColorExpression());
+    }
+  }
+}
+
+/** Get which level a room ref belongs to */
+export function getRoomLevel(ref: string): number | null {
+  const rooms = BackendService.getRoomList();
+  const room = rooms.find(r => r.ref === ref);
+  return room && room.level.length > 0 ? room.level[0] : null;
+}
+
+// ===== Core: apply visibility + heights based on mode =====
+
+function applyVisibility(map: maplibregl.Map): void {
+  const levels = BackendService.getAllLevels(); // [5,4,3,2,1]
+
+  for (const level of levels) {
+    try {
+    const prefix = `floor-${level}`;
+    const base = is3DMode ? getLevelBase(level) : 0;
+    const isActive = level === currentLevel;
+    const isBelow = level < currentLevel;
+    const isAbove = level > currentLevel;
+
+    if (is3DMode) {
+      // 3D stacked mode: show active + below, hide above
+      const show = isActive || isBelow;
+      const vis = show ? 'visible' : 'none';
+
+      setLayerVis(map, `${prefix}-rooms-3d`, vis);
+      setLayerVis(map, `${prefix}-rooms-outline`, isActive ? 'visible' : 'none');
+      setLayerVis(map, `${prefix}-rooms-labels`, 'none'); // hidden in 3D — FloatingLabels handles this
+      setLayerVis(map, `${prefix}-corridors-3d`, vis);
+      setLayerVis(map, `${prefix}-stairs-3d`, vis);
+      setLayerVis(map, `${prefix}-walls-3d`, vis);
+
+      if (show) {
+        // Set heights based on floor base
+        const roomTop = base + ROOM_THICKNESS;
+        const wallTop = base + ROOM_THICKNESS + WALL_EXTRA;
+
+        setPaint(map, `${prefix}-rooms-3d`, 'fill-extrusion-base', base);
+        setPaint(map, `${prefix}-rooms-3d`, 'fill-extrusion-height', roomTop);
+        setPaint(map, `${prefix}-rooms-3d`, 'fill-extrusion-opacity',
+          isActive ? ACTIVE_ROOM_OPACITY : INACTIVE_ROOM_OPACITY);
+
+        // Outline: thin edge walls spanning full room height
+        setPaint(map, `${prefix}-rooms-outline`, 'fill-extrusion-base', base);
+        setPaint(map, `${prefix}-rooms-outline`, 'fill-extrusion-height', roomTop + 0.3);
+        setPaint(map, `${prefix}-rooms-outline`, 'fill-extrusion-opacity', 0.75);
+
+        // Labels: handled by FloatingLabels module (symbol layers hidden in 3D)
+
+        setPaint(map, `${prefix}-corridors-3d`, 'fill-extrusion-base', base);
+        setPaint(map, `${prefix}-corridors-3d`, 'fill-extrusion-height', base + CORRIDOR_THICKNESS);
+        setPaint(map, `${prefix}-corridors-3d`, 'fill-extrusion-opacity',
+          isActive ? ACTIVE_CORRIDOR_OPACITY : INACTIVE_CORRIDOR_OPACITY);
+
+        setPaint(map, `${prefix}-stairs-3d`, 'fill-extrusion-base', base);
+        setPaint(map, `${prefix}-stairs-3d`, 'fill-extrusion-height', base + STAIRS_THICKNESS);
+        setPaint(map, `${prefix}-stairs-3d`, 'fill-extrusion-opacity',
+          isActive ? 0.7 : 0.25);
+
+        setPaint(map, `${prefix}-walls-3d`, 'fill-extrusion-base', roomTop);
+        setPaint(map, `${prefix}-walls-3d`, 'fill-extrusion-height', wallTop);
+        setPaint(map, `${prefix}-walls-3d`, 'fill-extrusion-opacity',
+          isActive ? ACTIVE_WALL_OPACITY : INACTIVE_WALL_OPACITY);
+      }
+    } else {
+      // 2D flat mode: show only active level, height = 0
+      const vis = isActive ? 'visible' : 'none';
+
+      setLayerVis(map, `${prefix}-rooms-3d`, vis);
+      setLayerVis(map, `${prefix}-rooms-outline`, vis);
+      setLayerVis(map, `${prefix}-rooms-labels`, vis);
+      setLayerVis(map, `${prefix}-corridors-3d`, vis);
+      setLayerVis(map, `${prefix}-stairs-3d`, vis);
+      setLayerVis(map, `${prefix}-walls-3d`, 'none'); // no walls in 2D
+
+      if (isActive) {
+        setPaint(map, `${prefix}-rooms-3d`, 'fill-extrusion-base', 0);
+        setPaint(map, `${prefix}-rooms-3d`, 'fill-extrusion-height', 0);
+        setPaint(map, `${prefix}-rooms-3d`, 'fill-extrusion-opacity', ACTIVE_ROOM_OPACITY);
+
+        // 2D outline: thin edge walls at ground
+        setPaint(map, `${prefix}-rooms-outline`, 'fill-extrusion-base', 0);
+        setPaint(map, `${prefix}-rooms-outline`, 'fill-extrusion-height', 0.2);
+        setPaint(map, `${prefix}-rooms-outline`, 'fill-extrusion-opacity', 0.75);
+
+        // Labels: native symbol layer handles 2D (FloatingLabels inactive)
+
+        setPaint(map, `${prefix}-corridors-3d`, 'fill-extrusion-base', 0);
+        setPaint(map, `${prefix}-corridors-3d`, 'fill-extrusion-height', 0);
+
+        setPaint(map, `${prefix}-stairs-3d`, 'fill-extrusion-base', 0);
+        setPaint(map, `${prefix}-stairs-3d`, 'fill-extrusion-height', 0);
+      }
+    }
+    } catch (e) {
+      console.warn(`applyVisibility error for level ${level}:`, e);
+    }
+  }
+
+  // Update floating labels — 3D: show at altitude, 2D: clear (symbol layer takes over)
+  if (is3DMode) {
+    const altitude = getLevelBase(currentLevel) + ROOM_THICKNESS + 0.5;
+    FloatingLabels.updateLabels(currentLevel, true, altitude);
+  } else {
+    FloatingLabels.updateLabels(currentLevel, false, 0);
+  }
+}
+
+// ===== Helpers =====
+
+function setLayerVis(map: maplibregl.Map, layerId: string, vis: string): void {
+  try {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, 'visibility', vis);
+    }
+  } catch (_) { /* layer not ready */ }
+}
+
+function setPaint(map: maplibregl.Map, layerId: string, prop: string, value: any): void {
+  try {
+    if (map.getLayer(layerId)) {
+      map.setPaintProperty(layerId, prop, value);
+    }
+  } catch (_) { /* layer not ready */ }
+}
+
+// ===== Layer creation (unchanged sources, but no initial heights) =====
+
+function addLevelLayers(map: maplibregl.Map, level: number): void {
+  if (addedLevels.has(level)) return;
+  addedLevels.add(level);
+
+  const levelGeoJson = BackendService.getLevelGeoJson(level);
+  const sourceId = `floor-${level}`;
+
+  const rooms: GeoJSON.Feature[] = [];
+  const corridors: GeoJSON.Feature[] = [];
+  const stairs: GeoJSON.Feature[] = [];
+  const other: GeoJSON.Feature[] = [];
+
+  for (const f of levelGeoJson.features) {
+    if (f.geometry.type !== 'Polygon' && f.geometry.type !== 'MultiPolygon') continue;
+    const indoor = f.properties.indoor;
+
+    if (indoor === 'corridor' || indoor === 'area') {
+      corridors.push(f);
+    } else if (f.properties.stairs === 'yes' || f.properties.highway === 'elevator') {
+      stairs.push(f);
+    } else if (indoor === 'room') {
+      rooms.push(f);
+    } else if (indoor && indoor !== 'pathway') {
+      other.push(f);
+    }
+  }
+
+  // Rooms
+  if (rooms.length > 0) {
+    map.addSource(`${sourceId}-rooms`, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: rooms },
+    });
+
+    map.addLayer({
+      id: `${sourceId}-rooms-3d`,
+      type: 'fill-extrusion',
+      source: `${sourceId}-rooms`,
+      layout: { visibility: 'none' },
+      paint: {
+        'fill-extrusion-color': buildRoomColorExpression(),
+        'fill-extrusion-height': 0,
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': ACTIVE_ROOM_OPACITY,
+        'fill-extrusion-vertical-gradient': true,
+      } as any,
+    });
+
+    // Room outline — extract polygon edges into thin wall strips
+    const edgeFeatures = buildEdgePolygons(rooms);
+    if (edgeFeatures.length > 0) {
+      map.addSource(`${sourceId}-rooms-edges`, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: edgeFeatures },
+      });
+
+      map.addLayer({
+        id: `${sourceId}-rooms-outline`,
+        type: 'fill-extrusion',
+        source: `${sourceId}-rooms-edges`,
+        layout: { visibility: 'none' },
+        paint: {
+          'fill-extrusion-color': '#1A237E',
+          'fill-extrusion-height': 0,
+          'fill-extrusion-base': 0,
+          'fill-extrusion-opacity': 0.75,
+        },
+      });
+    }
+
+    map.addLayer({
+      id: `${sourceId}-rooms-labels`,
+      type: 'symbol',
+      source: `${sourceId}-rooms`,
+      layout: {
+        visibility: 'none',
+        'text-field': ['get', 'ref'],
+        'text-size': [
+          'interpolate', ['linear'], ['zoom'],
+          19.5, 9, 20, 12, 20.5, 14, 21, 16,
+        ],
+        'text-font': ['Noto Sans Regular'],
+        'text-allow-overlap': false,
+        'text-ignore-placement': false,
+      },
+      paint: {
+        'text-color': '#263238',
+        'text-halo-color': 'rgba(255,255,255,0.85)',
+        'text-halo-width': 1.5,
+      },
+    });
+  }
+
+  // Corridors
+  if (corridors.length > 0) {
+    map.addSource(`${sourceId}-corridors`, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: corridors },
+    });
+
+    map.addLayer({
+      id: `${sourceId}-corridors-3d`,
+      type: 'fill-extrusion',
+      source: `${sourceId}-corridors`,
+      layout: { visibility: 'none' },
+      paint: {
+        'fill-extrusion-color': CORRIDOR_COLOR,
+        'fill-extrusion-height': 0,
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': ACTIVE_CORRIDOR_OPACITY,
+      },
+    });
+  }
+
+  // Stairs
+  if (stairs.length > 0) {
+    map.addSource(`${sourceId}-stairs`, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: stairs },
+    });
+
+    map.addLayer({
+      id: `${sourceId}-stairs-3d`,
+      type: 'fill-extrusion',
+      source: `${sourceId}-stairs`,
+      layout: { visibility: 'none' },
+      paint: {
+        'fill-extrusion-color': ROOM_COLORS.stairs,
+        'fill-extrusion-height': 0,
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': 0.7,
+      },
+    });
+  }
+
+  // Walls
+  const allPolygons = [...rooms, ...corridors, ...stairs, ...other];
+  if (allPolygons.length > 0) {
+    map.addSource(`${sourceId}-walls`, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: allPolygons },
+    });
+
+    map.addLayer({
+      id: `${sourceId}-walls-3d`,
+      type: 'fill-extrusion',
+      source: `${sourceId}-walls`,
+      layout: { visibility: 'none' },
+      paint: {
+        'fill-extrusion-color': WALL_COLOR,
+        'fill-extrusion-height': 0,
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': ACTIVE_WALL_OPACITY,
+      },
+    });
+  }
+}
+
+function buildRoomColorExpression(): maplibregl.ExpressionSpecification {
+  const entries: string[] = [];
+  for (const [type, color] of Object.entries(ROOM_COLORS)) {
+    if (type === 'corridor' || type === 'elevator') continue;
+    entries.push(type, color);
+  }
+  return [
+    'match', ['get', 'room_type'],
+    ...entries,
+    DEFAULT_ROOM_COLOR,
+  ] as unknown as maplibregl.ExpressionSpecification;
+}
+
+// ===== Edge geometry builder =====
+// Converts room polygons into thin rectangular strips along each edge.
+// This creates real 3D outlines that float at the correct floor height.
+
+const EDGE_THICKNESS = 0.000003; // ~0.3m in degrees at SKKU latitude
+
+function buildEdgePolygons(rooms: GeoJSON.Feature[]): GeoJSON.Feature[] {
+  const edges: GeoJSON.Feature[] = [];
+
+  for (const room of rooms) {
+    const geom = room.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon;
+    const rings = geom.type === 'Polygon'
+      ? [geom.coordinates[0]]
+      : geom.coordinates.map(c => c[0]);
+
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const a = ring[i];
+        const b = ring[i + 1];
+
+        // Perpendicular offset to create a thin rectangle
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 1e-9) continue;
+
+        // Normal vector scaled to EDGE_THICKNESS
+        const nx = (-dy / len) * EDGE_THICKNESS;
+        const ny = (dx / len) * EDGE_THICKNESS;
+
+        edges.push({
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[
+              [a[0] - nx, a[1] - ny],
+              [a[0] + nx, a[1] + ny],
+              [b[0] + nx, b[1] + ny],
+              [b[0] - nx, b[1] - ny],
+              [a[0] - nx, a[1] - ny], // close ring
+            ]],
+          },
+        });
+      }
+    }
+  }
+
+  return edges;
+}

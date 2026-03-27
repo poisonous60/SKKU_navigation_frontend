@@ -1,0 +1,378 @@
+// ===== Variables =====
+$header-height: 56px;
+$ui-padding: 12px;
+$primary: #025558;
+$accent: #42A5F5;
+$bg-dark: #1a1a2e;
+$text-light: #f5f5f5;
+$text-muted: rgba(255, 255, 255, 0.6);
+$radius: 8px;
+$shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+
+// ===== Reset & Base =====
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #0f0f1a;
+  color: $text-light;
+  overflow: hidden;
+}
+
+// ===== Loading Overlay =====
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: $bg-dark;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  transition: opacity 0.3s;
+
+  &.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  p { color: $text-muted; font-size: 14px; }
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: $accent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+// ===== Header =====
+#appHeader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: $header-height;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  padding: 0 $ui-padding;
+  gap: 12px;
+  background: rgba(26, 26, 46, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.header-left, .header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  #buildingInfo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+
+    strong { color: $text-light; }
+    span { color: $text-muted; font-size: 13px; }
+  }
+}
+
+.header-icon-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: $radius;
+  background: rgba(255,255,255,0.06);
+  color: $text-light;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+
+  &:hover { background: rgba(255,255,255,0.12); }
+  &.active { background: $accent; color: #fff; }
+
+  .material-icons { font-size: 20px; }
+}
+
+// ===== Search =====
+#searchWrapper {
+  position: relative;
+
+  input {
+    width: 220px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: $radius;
+    background: rgba(255,255,255,0.06);
+    color: $text-light;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+
+    &::placeholder { color: $text-muted; }
+    &:focus { border-color: $accent; }
+  }
+}
+
+.autocomplete-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  background: rgba(26, 26, 46, 0.98);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 0 0 $radius $radius;
+  z-index: 2000;
+
+  &.visible { display: block; }
+
+  .autocomplete-item {
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    color: $text-light;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+
+    &:hover, &.highlighted { background: rgba(66, 165, 245, 0.15); }
+
+    .room-ref { font-weight: 600; }
+    .room-meta { color: $text-muted; font-size: 11px; margin-left: 6px; }
+  }
+}
+
+// ===== Route Inputs =====
+#routeInputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  input {
+    width: 100px;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: $radius;
+    background: rgba(255,255,255,0.06);
+    color: $text-light;
+    font-size: 12px;
+    outline: none;
+
+    &::placeholder { color: $text-muted; }
+    &:focus { border-color: $accent; }
+  }
+}
+
+#routeInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: $accent;
+}
+
+// ===== Map =====
+#mainContent {
+  position: fixed;
+  top: $header-height;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+// MapLibre overrides
+.maplibregl-ctrl-attrib { font-size: 10px !important; }
+
+// ===== Floor Wheel =====
+#floorWheel {
+  position: fixed;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 900;
+  pointer-events: auto;
+
+  // Pill shape + glassmorphism
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px; // full pill
+  padding: 8px 6px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+#floorWheelInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.floor-wheel-item {
+  // Shared base
+  width: 40px;
+  height: 40px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+
+  // default (far) — faint dot only
+  &::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    opacity: 0;
+  }
+
+  // adjacent — ring indicator, translucent
+  &.adjacent {
+    color: rgba(255, 255, 255, 0.7);
+    border-color: rgba(66, 165, 245, 0.35);
+    background: rgba(66, 165, 245, 0.08);
+    font-size: 13px;
+  }
+
+  // active — solid fill
+  &.active {
+    color: #fff;
+    background: $accent;
+    border-color: $accent;
+    font-size: 15px;
+    box-shadow: 0 0 12px rgba(66, 165, 245, 0.5);
+  }
+
+  &:hover:not(.active) {
+    border-color: rgba(66, 165, 245, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(66, 165, 245, 0.12);
+  }
+}
+
+// ===== Room Popup =====
+.room-popup {
+  position: fixed;
+  z-index: 1100;
+  background: rgba(26, 26, 46, 0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: $radius;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: $shadow;
+}
+
+.popup-btn {
+  border: none;
+  background: transparent;
+  color: $text-light;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px;
+  text-align: left;
+  white-space: nowrap;
+
+  &:hover { background: rgba(66, 165, 245, 0.15); }
+}
+
+// ===== Room Info Popup =====
+.room-info-popup {
+  position: fixed;
+  z-index: 1050;
+  background: rgba(26, 26, 46, 0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: $radius;
+  padding: 12px 16px;
+  min-width: 180px;
+  box-shadow: $shadow;
+  pointer-events: none;
+  font-size: 13px;
+
+  .room-info-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+  .room-info-type { color: $text-muted; font-size: 12px; }
+  .room-info-level { color: $text-muted; font-size: 12px; }
+}
+
+// ===== Floating Labels (3D mode) =====
+.floating-labels-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.floating-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate3d(0, 0, 0);
+  font-family: 'Pretendard', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #263238;
+  text-shadow:
+    -1px -1px 0 rgba(255,255,255,0.9),
+     1px -1px 0 rgba(255,255,255,0.9),
+    -1px  1px 0 rgba(255,255,255,0.9),
+     1px  1px 0 rgba(255,255,255,0.9);
+  white-space: nowrap;
+  pointer-events: none;
+  will-change: transform;
+}
+
+// ===== FPS Counter =====
+.fps-counter {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  color: #00ff00;
+  font: 12px monospace;
+  z-index: 9999;
+  pointer-events: none;
+}

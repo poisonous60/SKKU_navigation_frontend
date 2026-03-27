@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SKKU 제1공학관 실내 내비게이션</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+</head>
+
+<body>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>데이터를 불러오는 중...</p>
+    </div>
+
+    <!-- HEADER BAR -->
+    <header id="appHeader">
+        <div class="header-left">
+            <button id="centerBtn" class="header-icon-btn" title="건물 위치로 이동">
+                <span class="material-icons">center_focus_weak</span>
+            </button>
+            <div id="searchWrapper">
+                <input type="text" id="roomSearchInput" placeholder="방 검색 (예: 21517)" autocomplete="off" />
+                <div id="searchAutocomplete" class="autocomplete-dropdown"></div>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <div id="buildingInfo">
+                <strong id="selectedBuilding"></strong>
+                <span id="description"></span>
+            </div>
+            <div id="routeInfo" style="display:none;">
+                <span id="routeInfoText"></span>
+                <button id="routeClearBtn" class="header-icon-btn" title="경로 지우기">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div id="routeInputs" style="display:none;">
+                <input type="text" id="startRoomInput" placeholder="출발" autocomplete="off" />
+                <input type="text" id="endRoomInput" placeholder="도착" autocomplete="off" />
+                <button id="findRouteBtn" class="header-icon-btn" title="경로 검색">
+                    <span class="material-icons">directions</span>
+                </button>
+            </div>
+            <button id="routeToggleBtn" class="header-icon-btn" title="경로 검색">
+                <span class="material-icons">directions</span>
+            </button>
+            <button id="switch3DBtn" class="header-icon-btn" title="2D/3D 전환">
+                <span class="material-icons" id="switch3DIcon">3d_rotation</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <div id="mainContent">
+        <div id="map"></div>
+    </div>
+
+    <!-- Floor wheel -->
+    <div id="floorWheel">
+        <div id="floorWheelInner"></div>
+    </div>
+
+    <!-- Room click popup -->
+    <div id="roomPopup" class="room-popup" style="display:none;">
+        <button id="popupSetStart" class="popup-btn">📍 출발로 설정</button>
+        <button id="popupSetEnd" class="popup-btn">🏁 도착으로 설정</button>
+    </div>
+
+    <!-- Room info popup (on map) -->
+    <div id="roomInfoPopup" class="room-info-popup" style="display:none;">
+        <div id="roomInfoContent"></div>
+    </div>
+</body>
+</html>
