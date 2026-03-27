@@ -1,0 +1,115 @@
+{
+  "name": "제1공학관",
+  "name_en": "Engineering Building 1",
+  "loc_ref": "ENG1",
+  "origin_wgs84": [126.975940, 37.293520],
+  "rotation_deg": -8.81,
+  "levels": [1, 2, 3, 4, 5],
+
+  "building_outline": "osm",
+
+  "wings": [
+    {
+      "id": "21",
+      "name": "21동",
+      "orientation": "horizontal",
+      "u_range": [0, 86],
+      "v_range": [0, 22],
+      "corridor": { "v_range": [8.5, 13.5] },
+      "rooms": {
+        "south": { "count": 8, "v_range": [0, 8.5] },
+        "north": { "count": 8, "v_range": [13.5, 22] }
+      }
+    },
+    {
+      "id": "22",
+      "name": "22동",
+      "orientation": "vertical",
+      "u_range": [66, 86],
+      "v_range": [22, 72],
+      "corridor": { "u_range": [72, 79] },
+      "rooms": {
+        "west": { "count": 6, "u_range": [66, 72] },
+        "east": { "count": 6, "u_range": [79, 86] }
+      }
+    },
+    {
+      "id": "23",
+      "name": "23동",
+      "orientation": "horizontal",
+      "u_range": [-10, 86],
+      "v_range": [72, 94],
+      "corridor": { "v_range": [80, 85] },
+      "rooms": {
+        "south": { "count": 6, "v_range": [72, 80] },
+        "north": { "count": 6, "v_range": [85, 94] }
+      }
+    }
+  ],
+
+  "connectors": [
+    {
+      "id": "conn_21_22",
+      "name": "21동-22동 연결 통로",
+      "type": "corridor",
+      "bounds": [72, 13.5, 79, 22],
+      "comment": "21동 복도 북쪽에서 22동 남쪽 입구까지"
+    },
+    {
+      "id": "conn_22_23",
+      "name": "22동-23동 연결 통로",
+      "type": "corridor",
+      "bounds": [72, 72, 79, 80],
+      "comment": "22동 북쪽에서 23동 복도 남쪽까지"
+    }
+  ],
+
+  "protrusions": [
+    {
+      "id": "prot_21w_stairs",
+      "name": "21동 서쪽 계단실 돌출",
+      "type": "area",
+      "bounds": [-6, -2, 0, 22],
+      "comment": "21동 서쪽 끝에서 외부로 튀어나온 계단실 영역"
+    },
+    {
+      "id": "prot_21e_stairs",
+      "name": "21동 동쪽 계단실 돌출",
+      "type": "area",
+      "bounds": [86, 0, 92, 14],
+      "comment": "21동 동쪽 끝에서 남쪽으로 튀어나온 계단실"
+    },
+    {
+      "id": "prot_23w_stairs",
+      "name": "23동 서쪽 계단실 돌출",
+      "type": "area",
+      "bounds": [-16, 72, -10, 94],
+      "comment": "23동 서쪽 끝에서 외부로 튀어나온 계단실 영역"
+    },
+    {
+      "id": "prot_23e_stairs",
+      "name": "23동 동쪽 계단실 돌출",
+      "type": "area",
+      "bounds": [86, 80, 92, 94],
+      "comment": "23동 동쪽 끝에서 동쪽으로 튀어나온 계단실"
+    },
+    {
+      "id": "prot_23_elev",
+      "name": "23동 엘리베이터 돌출",
+      "type": "area",
+      "bounds": [33, 77, 40, 80],
+      "comment": "23동 복도 남쪽으로 약간 돌출된 엘리베이터 공간"
+    }
+  ],
+
+  "stairs": [
+    { "id": "계단A", "ref": "계단A", "name": "계단 A", "bounds": [-5, 2, -1, 12], "levels": "1-5" },
+    { "id": "계단B", "ref": "계단B", "name": "계단 B", "bounds": [87, 2, 91, 12], "levels": "1-5" },
+    { "id": "계단C", "ref": "계단C", "name": "계단 C", "bounds": [87, 82, 91, 92], "levels": "1-5" },
+    { "id": "계단D", "ref": "계단D", "name": "계단 D", "bounds": [-15, 82, -11, 92], "levels": "1-5" }
+  ],
+
+  "elevators": [
+    { "id": "엘리베이터", "ref": "엘리베이터", "name": "엘리베이터", "bounds": [35, 78, 38, 84], "levels": "1-5", "wheelchair": true }
+  ]
+}

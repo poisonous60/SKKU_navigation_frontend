@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Large binary files
+*.zip
+sample_video/
+
+# IDE & tool configs
+.idea/
+.vscode/
+.gstack/
+.playwright-mcp/
+.mcp.json
+
+# Build outputs
+dist/
+js/dist/
+coverage/
+tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Nested git repos (handled by parent)
+2.5d_indoor_navigation_frontend/.git
