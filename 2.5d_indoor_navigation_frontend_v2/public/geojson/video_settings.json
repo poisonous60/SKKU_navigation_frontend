@@ -1,0 +1,164 @@
+{
+  "eng1_corridor_21_1F_cw.mp4": {
+    "yaw": 202.79998779296872
+  },
+  "eng1_corridor_21_1F_ccw.mp4": {
+    "yaw": 181.46666259765624
+  },
+  "eng1_corridor_21_2F_cw.mp4": {
+    "yaw": 154
+  },
+  "eng1_corridor_21_2F_ccw.mp4": {
+    "yaw": 145.33333740234355
+  },
+  "eng1_corridor_21_3F_cw.mp4": {
+    "yaw": 195.4666625976564
+  },
+  "eng1_corridor_21_3F_ccw.mp4": {
+    "yaw": 199.33333740234357
+  },
+  "eng1_corridor_21_4F_cw.mp4": {
+    "yaw": 178.53333740234393
+  },
+  "eng1_corridor_21_4F_ccw.mp4": {
+    "yaw": 171.06666259765632
+  },
+  "eng1_corridor_21_5F_cw.mp4": {
+    "yaw": 174.9333374023438
+  },
+  "eng1_corridor_21_5F_ccw.mp4": {
+    "yaw": 180.4000061035158
+  },
+  "eng1_corridor_22_1F_cw.mp4": {
+    "yaw": 173.20001220703136
+  },
+  "eng1_corridor_22_1F_ccw.mp4": {
+    "yaw": 198.933349609375
+  },
+  "eng1_corridor_22_2F_cw.mp4": {
+    "yaw": 164.26666870117185
+  },
+  "eng1_corridor_22_2F_ccw.mp4": {
+    "yaw": 165.20000610351553
+  },
+  "eng1_corridor_22_3F_cw.mp4": {
+    "yaw": 196.26666870117185
+  },
+  "eng1_corridor_22_3F_ccw.mp4": {
+    "yaw": 197.5999938964842
+  },
+  "eng1_corridor_22_4F_cw.mp4": {
+    "yaw": 292.6666809082029
+  },
+  "eng1_corridor_22_4F_ccw.mp4": {
+    "yaw": 194.40001220703118
+  },
+  "eng1_corridor_22_5F_cw.mp4": {
+    "yaw": 200.13333129882824
+  },
+  "eng1_corridor_22_5F_ccw.mp4": {
+    "yaw": 208.9333435058594
+  },
+  "eng1_corridor_23_1F_cw.mp4": {
+    "yaw": 191.46665649414035
+  },
+  "eng1_corridor_23_1F_ccw.mp4": {
+    "yaw": 180.13334350585956
+  },
+  "eng1_corridor_23_2F_cw.mp4": {
+    "yaw": 217.06668090820335
+  },
+  "eng1_corridor_23_2F_ccw.mp4": {
+    "yaw": 180.2666870117189
+  },
+  "eng1_corridor_23_3F_cw.mp4": {
+    "yaw": 186.26667480468745
+  },
+  "eng1_corridor_23_3F_ccw.mp4": {
+    "yaw": 210.13334350585944
+  },
+  "eng1_corridor_23_4F_cw.mp4": {
+    "yaw": 196.0000000000001
+  },
+  "eng1_corridor_23_4F_ccw.mp4": {
+    "yaw": 192.53334350585965
+  },
+  "eng1_corridor_23_5F_cw.mp4": {
+    "yaw": 188.13333740234373
+  },
+  "eng1_corridor_23_5F_ccw.mp4": {
+    "yaw": 201.46666870117178
+  },
+  "eng1_stair_1_up.mp4": {
+    "entryYaw": 206.66666259765645,
+    "exitYaw": 18.399999999999977
+  },
+  "eng1_stair_1_down.mp4": {
+    "entryYaw": 171.73334960937518,
+    "exitYaw": 352.2666748046875
+  },
+  "eng1_stair_2_up.mp4": {
+    "entryYaw": 217.4666625976564,
+    "exitYaw": 34.93333740234374
+  },
+  "eng1_stair_2_down.mp4": {
+    "entryYaw": 178.13333740234384,
+    "exitYaw": 359.6
+  },
+  "eng1_stair_3_up.mp4": {
+    "entryYaw": 261.3333435058596,
+    "exitYaw": 99.06666259765638
+  },
+  "eng1_stair_3_down.mp4": {
+    "entryYaw": 179.59998779296882,
+    "exitYaw": 356.53332519531244
+  },
+  "eng1_stair_4_up.mp4": {
+    "entryYaw": 208.8000000000004,
+    "exitYaw": 23.19999999999999
+  },
+  "eng1_stair_4_down.mp4": {
+    "entryYaw": 156.40001220703118,
+    "exitYaw": 327.19999389648433
+  },
+  "eng1_elev_1_1F.mp4": {
+    "entryYaw": 80.93333129882808,
+    "exitYaw": 258.6666625976561
+  },
+  "eng1_elev_1_2F.mp4": {
+    "entryYaw": 133.06667480468752,
+    "exitYaw": 312.1333374023437
+  },
+  "eng1_elev_1_3F.mp4": {
+    "entryYaw": 102.66667480468737,
+    "exitYaw": 283.4666625976563
+  },
+  "eng1_elev_1_4F.mp4": {
+    "entryYaw": 108,
+    "exitYaw": 288.93333740234385
+  },
+  "eng1_elev_1_5F.mp4": {
+    "entryYaw": 161.86666259765616,
+    "exitYaw": 342.26666259765625
+  },
+  "eng1_elev_2_1F.mp4": {
+    "entryYaw": 152.66666259765634,
+    "exitYaw": 331.20000000000005
+  },
+  "eng1_elev_2_2F.mp4": {
+    "entryYaw": 95.73334350585935,
+    "exitYaw": 270.93332519531236
+  },
+  "eng1_elev_2_3F.mp4": {
+    "entryYaw": 112.40000610351558,
+    "exitYaw": 287.8666625976563
+  },
+  "eng1_elev_2_4F.mp4": {
+    "entryYaw": 101.86666870117188,
+    "exitYaw": 281.6
+  },
+  "eng1_elev_2_5F.mp4": {
+    "entryYaw": 93.33333740234377,
+    "exitYaw": 266.9333251953125
+  }
+}

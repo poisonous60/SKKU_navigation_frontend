@@ -16,6 +16,18 @@ export interface NavEdge {
   from: string;
   to: string;
   weight: number; // meters
+  videoFwd?: string;    // 360° video for from→to direction (or entry clip for stairs/elev)
+  videoFwdStart?: number;
+  videoFwdEnd?: number;
+  videoFwdExit?: string;    // exit clip video (stairs/elevator only)
+  videoFwdExitStart?: number;
+  videoFwdExitEnd?: number;
+  videoRev?: string;
+  videoRevStart?: number;
+  videoRevEnd?: number;
+  videoRevExit?: string;
+  videoRevExitStart?: number;
+  videoRevExitEnd?: number;
 }
 
 export interface NavGraph {
@@ -46,6 +58,8 @@ export interface EditorState {
   graph: NavGraph;
   mode: EditorMode;
   selectedNodeId: string | null;
+  selectedEdgeId: string | null;
+  selectedEdgeIds: string[];
   edgeStartNodeId: string | null;
   currentLevel: number;
   undoStack: Command[];
@@ -72,6 +86,18 @@ export interface NavGraphExport {
     from: string;
     to: string;
     weight: number;
+    videoFwd?: string;
+    videoFwdStart?: number;
+    videoFwdEnd?: number;
+    videoFwdExit?: string;
+    videoFwdExitStart?: number;
+    videoFwdExitEnd?: number;
+    videoRev?: string;
+    videoRevStart?: number;
+    videoRevEnd?: number;
+    videoRevExit?: string;
+    videoRevExitStart?: number;
+    videoRevExitEnd?: number;
   }>;
 }
 
@@ -80,13 +106,18 @@ export interface NavGraphExport {
 export interface EditorMapCallbacks {
   onMapClick(lngLat: [number, number]): void;
   onNodeClick(nodeId: string): void;
-  onEdgeClick(edgeId: string): void;
+  onEdgeClick(edgeId: string, shiftKey: boolean): void;
 }
 
 export interface PanelCallbacks {
   onModeChange(mode: EditorMode): void;
   onNodeUpdate(nodeId: string, props: Partial<NavNode>): void;
   onNodeDelete(nodeId: string): void;
+  onEdgeUpdate(edgeId: string, props: Partial<NavEdge>): void;
+  onEdgeDelete(edgeId: string): void;
+  onSetTime(edgeId: string, direction: 'fwd' | 'rev' | 'fwdExit' | 'revExit'): void;
+  onBatchVideoAssign(edgeIds: string[], direction: 'fwd' | 'rev', video: string | undefined): void;
+  onSplitAssign(edgeIds: string[], direction: 'fwd' | 'rev', video: string): void;
   onRoomUpdate(featureIdx: number, props: { ref?: string; room_type?: string }): void;
   onRoomExport(): void;
   onUndo(): void;

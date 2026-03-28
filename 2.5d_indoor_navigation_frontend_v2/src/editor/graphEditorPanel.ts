@@ -1,6 +1,8 @@
 // ===== Navigation Graph Editor — Floating Panel UI =====
 
-import { NavNode, EditorMode, PanelCallbacks, ALL_NODE_TYPES, NODE_TYPE_LABELS, NavNodeType, ROOM_TYPES, RoomAutoApplyPreset, RoomType } from './graphEditorTypes';
+import { NavNode, NavEdge, EditorMode, PanelCallbacks, ALL_NODE_TYPES, NODE_TYPE_LABELS, NavNodeType, ROOM_TYPES, RoomAutoApplyPreset, RoomType } from './graphEditorTypes';
+import { suggestVideosForEdge, getAllVideos, getOppositeVideo } from './videoCatalog';
+import { openVideoSettingsPanel } from './videoSettingsPanel';
 
 let panelEl: HTMLElement | null = null;
 let callbacks: PanelCallbacks | null = null;
@@ -94,6 +96,115 @@ export function createPanel(cb: PanelCallbacks): HTMLElement {
         </div>
       </div>
 
+      <div class="ge-section ge-edge-props" id="geEdgeProps" style="display:none">
+        <div class="ge-props-title">
+          <span>Selected Edge</span>
+          <button class="ge-small-btn ge-delete-btn" id="geEdgeDelete" title="엣지 삭제">
+            <span class="material-icons" style="font-size:16px">delete</span>
+          </button>
+        </div>
+        <div class="ge-prop-row">
+          <label>Weight</label>
+          <span id="geEdgeWeight" class="ge-prop-value"></span>
+        </div>
+
+        <div class="ge-props-title" style="margin-top:6px">
+          <span id="geEdgeFwdLabel">→ From → To</span>
+        </div>
+        <div class="ge-vertical-clip-label" id="geEdgeFwdEntryLabel" style="display:none">들어갈 때</div>
+        <div class="ge-prop-row">
+          <select id="geEdgeVideoFwd" class="ge-select">
+            <option value="">(없음)</option>
+          </select>
+        </div>
+        <div class="ge-prop-row ge-edge-time-row" id="geEdgeFwdTimeRow" style="display:none">
+          <span id="geEdgeFwdTime" class="ge-edge-time">-</span>
+          <button class="ge-small-btn" id="geSetTimeFwd" title="Set Time Range">
+            <span class="material-icons" style="font-size:16px">timer</span>
+          </button>
+        </div>
+        <div id="geEdgeFwdExitSection" style="display:none">
+          <div class="ge-vertical-clip-label">나올 때</div>
+          <div class="ge-prop-row">
+            <select id="geEdgeVideoFwdExit" class="ge-select">
+              <option value="">(없음)</option>
+            </select>
+          </div>
+          <div class="ge-prop-row ge-edge-time-row" id="geEdgeFwdExitTimeRow" style="display:none">
+            <span id="geEdgeFwdExitTime" class="ge-edge-time">-</span>
+            <button class="ge-small-btn" id="geSetTimeFwdExit" title="Set Time Range">
+              <span class="material-icons" style="font-size:16px">timer</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="ge-props-title" style="margin-top:6px">
+          <span id="geEdgeRevLabel">← To → From</span>
+        </div>
+        <div class="ge-vertical-clip-label" id="geEdgeRevEntryLabel" style="display:none">들어갈 때</div>
+        <div class="ge-prop-row">
+          <select id="geEdgeVideoRev" class="ge-select">
+            <option value="">(없음)</option>
+          </select>
+        </div>
+        <div class="ge-prop-row ge-edge-time-row" id="geEdgeRevTimeRow" style="display:none">
+          <span id="geEdgeRevTime" class="ge-edge-time">-</span>
+          <button class="ge-small-btn" id="geSetTimeRev" title="Set Time Range">
+            <span class="material-icons" style="font-size:16px">timer</span>
+          </button>
+        </div>
+        <div id="geEdgeRevExitSection" style="display:none">
+          <div class="ge-vertical-clip-label">나올 때</div>
+          <div class="ge-prop-row">
+            <select id="geEdgeVideoRevExit" class="ge-select">
+              <option value="">(없음)</option>
+            </select>
+          </div>
+          <div class="ge-prop-row ge-edge-time-row" id="geEdgeRevExitTimeRow" style="display:none">
+            <span id="geEdgeRevExitTime" class="ge-edge-time">-</span>
+            <button class="ge-small-btn" id="geSetTimeRevExit" title="Set Time Range">
+              <span class="material-icons" style="font-size:16px">timer</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ge-section ge-edge-props" id="geMultiEdgeProps" style="display:none">
+        <div class="ge-props-title">
+          <span id="geMultiEdgeCount">0 edges selected</span>
+        </div>
+
+        <div class="ge-props-title" style="margin-top:6px">
+          <span id="geMultiEdgeFwdLabel">→</span>
+        </div>
+        <div class="ge-prop-row">
+          <select id="geMultiEdgeVideoFwd" class="ge-select">
+            <option value="">(없음)</option>
+          </select>
+        </div>
+        <div class="ge-multi-time-info" id="geMultiEdgeFwdTimeInfo" style="display:none"></div>
+        <div class="ge-prop-row ge-edge-time-row" id="geMultiEdgeFwdSplitRow" style="display:none">
+          <button class="ge-action-btn" id="geSplitAssignFwd">
+            <span class="material-icons" style="font-size:16px">content_cut</span> Assign & Split
+          </button>
+        </div>
+
+        <div class="ge-props-title" style="margin-top:6px">
+          <span id="geMultiEdgeRevLabel">←</span>
+        </div>
+        <div class="ge-prop-row">
+          <select id="geMultiEdgeVideoRev" class="ge-select">
+            <option value="">(없음)</option>
+          </select>
+        </div>
+        <div class="ge-multi-time-info" id="geMultiEdgeRevTimeInfo" style="display:none"></div>
+        <div class="ge-prop-row ge-edge-time-row" id="geMultiEdgeRevSplitRow" style="display:none">
+          <button class="ge-action-btn" id="geSplitAssignRev">
+            <span class="material-icons" style="font-size:16px">content_cut</span> Assign & Split
+          </button>
+        </div>
+      </div>
+
       <div class="ge-section ge-edge-info" id="geEdgeInfo" style="display:none">
         <div class="ge-props-title">
           <span>Edge Mode</span>
@@ -171,6 +282,9 @@ export function createPanel(cb: PanelCallbacks): HTMLElement {
             <span class="material-icons" style="font-size:16px">file_download</span> Export
           </button>
         </div>
+        <button class="ge-action-btn" id="geVideoSettings">
+            <span class="material-icons" style="font-size:16px">360</span> Video Settings
+          </button>
         <button class="ge-action-btn ge-danger-btn" id="geClearAll">Clear All</button>
       </div>
     </div>
@@ -234,6 +348,12 @@ export function setActiveMode(mode: EditorMode): void {
   const addNodeOpts = document.getElementById('geAddNodeOpts');
   if (addNodeOpts) addNodeOpts.style.display = mode === 'add-node' ? 'block' : 'none';
 
+  const edgeProps = document.getElementById('geEdgeProps');
+  if (edgeProps) edgeProps.style.display = 'none';
+
+  const multiEdgeProps = document.getElementById('geMultiEdgeProps');
+  if (multiEdgeProps) multiEdgeProps.style.display = 'none';
+
   const edgeInfo = document.getElementById('geEdgeInfo');
   if (edgeInfo) edgeInfo.style.display = mode === 'add-edge' ? 'block' : 'none';
 
@@ -264,6 +384,271 @@ export function showRoomProperties(props: { _idx?: number; _area_m2?: number; re
 export function updateRoomRefInput(ref: string): void {
   const refInput = document.getElementById('geRoomRef') as HTMLInputElement;
   if (refInput) refInput.value = ref;
+}
+
+export function showEdgeProperties(edge: NavEdge, fromNode: NavNode, toNode: NavNode): void {
+  const propsEl = document.getElementById('geEdgeProps');
+  if (!propsEl) return;
+
+  propsEl.style.display = 'block';
+  propsEl.dataset.edgeId = edge.id;
+
+  const fromLabel = fromNode.label || fromNode.id.slice(5, 13);
+  const toLabel = toNode.label || toNode.id.slice(5, 13);
+  setText('geEdgeWeight', edge.weight + 'm');
+
+  // Detect vertical edge (stairs/elevator)
+  const isVertical = fromNode.type === 'stairs' || fromNode.type === 'elevator'
+    || toNode.type === 'stairs' || toNode.type === 'elevator'
+    || fromNode.level !== toNode.level;
+
+  // Direction labels
+  setText('geEdgeFwdLabel', `FWD  ${fromLabel} → ${toLabel}`);
+  setText('geEdgeRevLabel', `REV  ${toLabel} → ${fromLabel}`);
+
+  // Populate video dropdowns
+  const suggested = suggestVideosForEdge(fromNode, toNode);
+
+  function populateVideoSelect(selectEl: HTMLSelectElement): void {
+    selectEl.innerHTML = '<option value="">(없음)</option>';
+    const groups: Record<string, typeof suggested> = { corridor: [], stair: [], elevator: [] };
+    for (const v of suggested) groups[v.type].push(v);
+    const tLabels: Record<string, string> = { corridor: '복도', stair: '계단', elevator: '엘리베이터' };
+    for (const type of ['corridor', 'stair', 'elevator'] as const) {
+      if (groups[type].length === 0) continue;
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = tLabels[type];
+      for (const v of groups[type]) {
+        const opt = document.createElement('option');
+        opt.value = v.filename;
+        opt.textContent = v.label;
+        optgroup.appendChild(opt);
+      }
+      selectEl.appendChild(optgroup);
+    }
+  }
+
+  for (const dir of ['Fwd', 'Rev'] as const) {
+    // Entry/main video
+    const selectEl = document.getElementById(`geEdgeVideo${dir}`) as HTMLSelectElement;
+    if (selectEl) {
+      populateVideoSelect(selectEl);
+      const videoKey = dir === 'Fwd' ? 'videoFwd' : 'videoRev';
+      selectEl.value = edge[videoKey] || '';
+
+      const hasVideo = !!edge[videoKey];
+      const timeRow = document.getElementById(`geEdge${dir}TimeRow`);
+      if (timeRow) timeRow.style.display = hasVideo ? 'flex' : 'none';
+
+      const startKey = dir === 'Fwd' ? 'videoFwdStart' : 'videoRevStart';
+      const endKey = dir === 'Fwd' ? 'videoFwdEnd' : 'videoRevEnd';
+      const s = edge[startKey];
+      const e2 = edge[endKey];
+      setText(`geEdge${dir}Time`, (s !== undefined && e2 !== undefined) ? `${fmtSec(s)} ~ ${fmtSec(e2)}` : '-');
+    }
+
+    // Show/hide "들어갈 때" label and exit section
+    const entryLabel = document.getElementById(`geEdge${dir}EntryLabel`);
+    if (entryLabel) entryLabel.style.display = isVertical ? 'block' : 'none';
+
+    const exitSection = document.getElementById(`geEdge${dir}ExitSection`);
+    if (exitSection) exitSection.style.display = isVertical ? 'block' : 'none';
+
+    // Exit video (vertical edges only)
+    if (isVertical) {
+      const exitSelect = document.getElementById(`geEdgeVideo${dir}Exit`) as HTMLSelectElement;
+      if (exitSelect) {
+        populateVideoSelect(exitSelect);
+        const exitVideoKey = dir === 'Fwd' ? 'videoFwdExit' : 'videoRevExit';
+        exitSelect.value = edge[exitVideoKey] || '';
+
+        const hasExitVideo = !!edge[exitVideoKey];
+        const exitTimeRow = document.getElementById(`geEdge${dir}ExitTimeRow`);
+        if (exitTimeRow) exitTimeRow.style.display = hasExitVideo ? 'flex' : 'none';
+
+        const exitStartKey = dir === 'Fwd' ? 'videoFwdExitStart' : 'videoRevExitStart';
+        const exitEndKey = dir === 'Fwd' ? 'videoFwdExitEnd' : 'videoRevExitEnd';
+        const es = edge[exitStartKey];
+        const ee = edge[exitEndKey];
+        setText(`geEdge${dir}ExitTime`, (es !== undefined && ee !== undefined) ? `${fmtSec(es)} ~ ${fmtSec(ee)}` : '-');
+      }
+    }
+  }
+}
+
+function fmtSec(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = (s % 60).toFixed(1);
+  return m > 0 ? `${m}:${sec.padStart(4, '0')}` : `${sec}s`;
+}
+
+interface ChainEntry { edge: NavEdge; aligned: boolean; }
+
+function getOrderedChain(edges: NavEdge[]): ChainEntry[] | null {
+  if (edges.length <= 1) return edges.map(e => ({ edge: e, aligned: true }));
+
+  const nodeToEdges = new Map<string, NavEdge[]>();
+  for (const e of edges) {
+    for (const nid of [e.from, e.to]) {
+      if (!nodeToEdges.has(nid)) nodeToEdges.set(nid, []);
+      nodeToEdges.get(nid)!.push(e);
+    }
+  }
+
+  const endpoints = [...nodeToEdges.entries()].filter(([, list]) => list.length === 1).map(([n]) => n);
+  if (endpoints.length !== 2) return null;
+
+  const result: ChainEntry[] = [];
+  const used = new Set<string>();
+  let current = endpoints[0];
+
+  while (result.length < edges.length) {
+    const next = (nodeToEdges.get(current) || []).find(e => !used.has(e.id));
+    if (!next) return null;
+    used.add(next.id);
+    const aligned = next.from === current;
+    result.push({ edge: next, aligned });
+    current = aligned ? next.to : next.from;
+  }
+
+  return result;
+}
+
+function getChainEndpoints(edges: NavEdge[]): { start: string; end: string } | null {
+  if (edges.length === 0) return null;
+  if (edges.length === 1) return { start: edges[0].from, end: edges[0].to };
+
+  // Count how many times each node appears as from/to
+  const nodeCount = new Map<string, number>();
+  for (const e of edges) {
+    for (const nid of [e.from, e.to]) {
+      nodeCount.set(nid, (nodeCount.get(nid) || 0) + 1);
+    }
+  }
+
+  // Endpoint nodes appear exactly once (they're at the ends of the chain)
+  const endpoints = [...nodeCount.entries()].filter(([, c]) => c === 1).map(([n]) => n);
+  if (endpoints.length !== 2) return null;
+
+  // Walk chain to determine order
+  const edgeSet = new Set(edges.map(e => e.id));
+  const nodeToEdge = new Map<string, NavEdge[]>();
+  for (const e of edges) {
+    for (const nid of [e.from, e.to]) {
+      if (!nodeToEdge.has(nid)) nodeToEdge.set(nid, []);
+      nodeToEdge.get(nid)!.push(e);
+    }
+  }
+
+  let current = endpoints[0];
+  const used = new Set<string>();
+  for (let i = 0; i < edges.length; i++) {
+    const next = (nodeToEdge.get(current) || []).find(e => !used.has(e.id));
+    if (!next) return null;
+    used.add(next.id);
+    current = next.from === current ? next.to : next.from;
+  }
+
+  return { start: endpoints[0], end: current };
+}
+
+export function hideEdgeProperties(): void {
+  const propsEl = document.getElementById('geEdgeProps');
+  if (propsEl) propsEl.style.display = 'none';
+  const multiEl = document.getElementById('geMultiEdgeProps');
+  if (multiEl) multiEl.style.display = 'none';
+}
+
+export function showMultiEdgeProperties(edges: NavEdge[], nodes: Record<string, NavNode>): void {
+  // Hide single-edge panel
+  const singleEl = document.getElementById('geEdgeProps');
+  if (singleEl) singleEl.style.display = 'none';
+
+  const multiEl = document.getElementById('geMultiEdgeProps');
+  if (!multiEl) return;
+  multiEl.style.display = 'block';
+
+  // Detect chain endpoints
+  const endpoints = getChainEndpoints(edges);
+  const startLabel = endpoints ? (nodes[endpoints.start]?.label || endpoints.start.slice(5, 13)) : '?';
+  const endLabel = endpoints ? (nodes[endpoints.end]?.label || endpoints.end.slice(5, 13)) : '?';
+
+  setText('geMultiEdgeCount', `${edges.length} edges selected`);
+  setText('geMultiEdgeFwdLabel', `FWD  ${startLabel} → ${endLabel}`);
+  setText('geMultiEdgeRevLabel', `REV  ${endLabel} → ${startLabel}`);
+
+  // Store edge IDs
+  multiEl.dataset.edgeIds = edges.map(e => e.id).join(',');
+
+  // Chain alignment
+  const chain = getOrderedChain(edges);
+  const orderedEdges = chain ? chain.map(c => c.edge) : edges;
+
+  function resolveKeys(chainIdx: number, dir: 'fwd' | 'rev') {
+    const aligned = chain ? chain[chainIdx].aligned : true;
+    const effectiveFwd = (dir === 'fwd') === aligned;
+    return {
+      videoKey: effectiveFwd ? 'videoFwd' as const : 'videoRev' as const,
+      startKey: effectiveFwd ? 'videoFwdStart' as const : 'videoRevStart' as const,
+      endKey: effectiveFwd ? 'videoFwdEnd' as const : 'videoRevEnd' as const,
+    };
+  }
+
+  // Populate both direction rows
+  const allVideos = getAllVideos();
+  const groups: Record<string, typeof allVideos> = { corridor: [], stair: [], elevator: [] };
+  for (const v of allVideos) groups[v.type].push(v);
+  const typeLabels: Record<string, string> = { corridor: '복도', stair: '계단', elevator: '엘리베이터' };
+
+  for (const dir of ['Fwd', 'Rev'] as const) {
+    const dirKey = dir.toLowerCase() as 'fwd' | 'rev';
+    const selectEl = document.getElementById(`geMultiEdgeVideo${dir}`) as HTMLSelectElement;
+    if (!selectEl) continue;
+
+    // Populate dropdown
+    selectEl.innerHTML = '<option value="">(없음)</option>';
+    for (const type of ['corridor', 'stair', 'elevator'] as const) {
+      if (groups[type].length === 0) continue;
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = typeLabels[type];
+      for (const v of groups[type]) {
+        const opt = document.createElement('option');
+        opt.value = v.filename;
+        opt.textContent = v.label;
+        optgroup.appendChild(opt);
+      }
+      selectEl.appendChild(optgroup);
+    }
+
+    // Auto-select video if all edges share the same one
+    const videos = orderedEdges.map((e, i) => e[resolveKeys(i, dirKey).videoKey]).filter(Boolean);
+    const uniqueVideos = [...new Set(videos)];
+    if (uniqueVideos.length === 1) selectEl.value = uniqueVideos[0]!;
+
+    // Show/hide split row and time info
+    const hasVideo = !!selectEl.value;
+    const splitRow = document.getElementById(`geMultiEdge${dir}SplitRow`);
+    if (splitRow) splitRow.style.display = hasVideo ? 'flex' : 'none';
+
+    const infoEl = document.getElementById(`geMultiEdge${dir}TimeInfo`);
+    if (infoEl) {
+      const hasAnyTimes = orderedEdges.some((e, i) => e[resolveKeys(i, dirKey).startKey] !== undefined);
+      if (hasAnyTimes && uniqueVideos.length === 1) {
+        const lines: string[] = [];
+        for (let i = 0; i < orderedEdges.length; i++) {
+          const keys = resolveKeys(i, dirKey);
+          const s = orderedEdges[i][keys.startKey];
+          const e2 = orderedEdges[i][keys.endKey];
+          const timeStr = (s !== undefined && e2 !== undefined) ? `${fmtSec(s)}~${fmtSec(e2)}` : '?';
+          lines.push(`E${i + 1}: ${timeStr}`);
+        }
+        infoEl.textContent = lines.join('  ');
+        infoEl.style.display = 'block';
+      } else {
+        infoEl.style.display = 'none';
+      }
+    }
+  }
 }
 
 export function setEdgeHint(text: string): void {
@@ -341,6 +726,11 @@ function wireEvents(): void {
   // Export
   document.getElementById('geExport')?.addEventListener('click', () => callbacks?.onExport());
 
+  // Video settings
+  document.getElementById('geVideoSettings')?.addEventListener('click', () => {
+    openVideoSettingsPanel();
+  });
+
   // Clear all
   document.getElementById('geClearAll')?.addEventListener('click', () => {
     if (confirm('모든 노드와 엣지를 삭제하시겠습니까?')) {
@@ -368,6 +758,150 @@ function wireEvents(): void {
   document.getElementById('geRoomExport')?.addEventListener('click', () => {
     callbacks?.onRoomExport();
   });
+
+  // Edge video change — forward (auto-assigns reverse)
+  document.getElementById('geEdgeVideoFwd')?.addEventListener('change', (e) => {
+    const edgeId = document.getElementById('geEdgeProps')?.dataset.edgeId;
+    if (edgeId) {
+      const videoFwd = (e.target as HTMLSelectElement).value || undefined;
+      const props: Record<string, any> = { videoFwd };
+      const timeRow = document.getElementById('geEdgeFwdTimeRow');
+      if (timeRow) timeRow.style.display = videoFwd ? 'flex' : 'none';
+
+      // Auto-assign reverse
+      if (videoFwd) {
+        const opposite = getOppositeVideo(videoFwd);
+        if (opposite) {
+          props.videoRev = opposite;
+          const revSelect = document.getElementById('geEdgeVideoRev') as HTMLSelectElement;
+          if (revSelect) revSelect.value = opposite;
+          const revTimeRow = document.getElementById('geEdgeRevTimeRow');
+          if (revTimeRow) revTimeRow.style.display = 'flex';
+        }
+      }
+      callbacks?.onEdgeUpdate(edgeId, props);
+    }
+  });
+
+  // Edge video change — reverse (auto-assigns forward)
+  document.getElementById('geEdgeVideoRev')?.addEventListener('change', (e) => {
+    const edgeId = document.getElementById('geEdgeProps')?.dataset.edgeId;
+    if (edgeId) {
+      const videoRev = (e.target as HTMLSelectElement).value || undefined;
+      const props: Record<string, any> = { videoRev };
+      const timeRow = document.getElementById('geEdgeRevTimeRow');
+      if (timeRow) timeRow.style.display = videoRev ? 'flex' : 'none';
+
+      // Auto-assign forward
+      if (videoRev) {
+        const opposite = getOppositeVideo(videoRev);
+        if (opposite) {
+          props.videoFwd = opposite;
+          const fwdSelect = document.getElementById('geEdgeVideoFwd') as HTMLSelectElement;
+          if (fwdSelect) fwdSelect.value = opposite;
+          const fwdTimeRow = document.getElementById('geEdgeFwdTimeRow');
+          if (fwdTimeRow) fwdTimeRow.style.display = 'flex';
+        }
+      }
+      callbacks?.onEdgeUpdate(edgeId, props);
+    }
+  });
+
+  // Set time — forward / reverse (entry)
+  document.getElementById('geSetTimeFwd')?.addEventListener('click', () => {
+    const edgeId = document.getElementById('geEdgeProps')?.dataset.edgeId;
+    if (edgeId) callbacks?.onSetTime(edgeId, 'fwd');
+  });
+  document.getElementById('geSetTimeRev')?.addEventListener('click', () => {
+    const edgeId = document.getElementById('geEdgeProps')?.dataset.edgeId;
+    if (edgeId) callbacks?.onSetTime(edgeId, 'rev');
+  });
+
+  // Exit video change — forward (auto-assigns reverse exit for stairs)
+  document.getElementById('geEdgeVideoFwdExit')?.addEventListener('change', (e) => {
+    const edgeId = document.getElementById('geEdgeProps')?.dataset.edgeId;
+    if (edgeId) {
+      const v = (e.target as HTMLSelectElement).value || undefined;
+      const props: Record<string, any> = { videoFwdExit: v };
+      const row = document.getElementById('geEdgeFwdExitTimeRow');
+      if (row) row.style.display = v ? 'flex' : 'none';
+
+      if (v) {
+        const opposite = getOppositeVideo(v);
+        if (opposite) {
+          props.videoRevExit = opposite;
+          const revSelect = document.getElementById('geEdgeVideoRevExit') as HTMLSelectElement;
+          if (revSelect) revSelect.value = opposite;
+          const revRow = document.getElementById('geEdgeRevExitTimeRow');
+          if (revRow) revRow.style.display = 'flex';
+        }
+      }
+      callbacks?.onEdgeUpdate(edgeId, props);
+    }
+  });
+  document.getElementById('geEdgeVideoRevExit')?.addEventListener('change', (e) => {
+    const edgeId = document.getElementById('geEdgeProps')?.dataset.edgeId;
+    if (edgeId) {
+      const v = (e.target as HTMLSelectElement).value || undefined;
+      const props: Record<string, any> = { videoRevExit: v };
+      const row = document.getElementById('geEdgeRevExitTimeRow');
+      if (row) row.style.display = v ? 'flex' : 'none';
+
+      if (v) {
+        const opposite = getOppositeVideo(v);
+        if (opposite) {
+          props.videoFwdExit = opposite;
+          const fwdSelect = document.getElementById('geEdgeVideoFwdExit') as HTMLSelectElement;
+          if (fwdSelect) fwdSelect.value = opposite;
+          const fwdRow = document.getElementById('geEdgeFwdExitTimeRow');
+          if (fwdRow) fwdRow.style.display = 'flex';
+        }
+      }
+      callbacks?.onEdgeUpdate(edgeId, props);
+    }
+  });
+
+  // Set time — exit clips
+  document.getElementById('geSetTimeFwdExit')?.addEventListener('click', () => {
+    const edgeId = document.getElementById('geEdgeProps')?.dataset.edgeId;
+    if (edgeId) callbacks?.onSetTime(edgeId, 'fwdExit');
+  });
+  document.getElementById('geSetTimeRevExit')?.addEventListener('click', () => {
+    const edgeId = document.getElementById('geEdgeProps')?.dataset.edgeId;
+    if (edgeId) callbacks?.onSetTime(edgeId, 'revExit');
+  });
+
+  // Edge delete
+  document.getElementById('geEdgeDelete')?.addEventListener('click', () => {
+    const edgeId = document.getElementById('geEdgeProps')?.dataset.edgeId;
+    if (edgeId) callbacks?.onEdgeDelete(edgeId);
+  });
+
+  // Multi-edge video change + split assign — per direction
+  for (const dir of ['Fwd', 'Rev'] as const) {
+    const dirKey = dir.toLowerCase() as 'fwd' | 'rev';
+
+    // Video dropdown change → immediate assign
+    document.getElementById(`geMultiEdgeVideo${dir}`)?.addEventListener('change', (e) => {
+      const video = (e.target as HTMLSelectElement).value || undefined;
+      const splitRow = document.getElementById(`geMultiEdge${dir}SplitRow`);
+      if (splitRow) splitRow.style.display = video ? 'flex' : 'none';
+
+      const multiEl = document.getElementById('geMultiEdgeProps');
+      const edgeIdsStr = multiEl?.dataset.edgeIds;
+      if (!edgeIdsStr) return;
+      callbacks?.onBatchVideoAssign(edgeIdsStr.split(','), dirKey, video);
+    });
+
+    // Split assign button
+    document.getElementById(`geSplitAssign${dir}`)?.addEventListener('click', () => {
+      const multiEl = document.getElementById('geMultiEdgeProps');
+      const edgeIdsStr = multiEl?.dataset.edgeIds;
+      if (!edgeIdsStr) return;
+      const video = (document.getElementById(`geMultiEdgeVideo${dir}`) as HTMLSelectElement)?.value;
+      if (video) callbacks?.onSplitAssign(edgeIdsStr.split(','), dirKey, video);
+    });
+  }
 
   // Auto-apply toggle
   document.getElementById('geAutoApplyToggle')?.addEventListener('change', (e) => {

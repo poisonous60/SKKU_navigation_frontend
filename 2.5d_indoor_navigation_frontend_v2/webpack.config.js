@@ -57,7 +57,10 @@ module.exports = (env, argv) => {
       }),
     ],
     devServer: {
-      static: { directory: path.join(__dirname, 'public'), watch: false },
+      static: [
+        { directory: path.join(__dirname, 'public'), watch: false },
+        { directory: path.resolve('E:/360video/260328/eng1_mp4'), publicPath: '/videos', watch: false },
+      ],
       port: 8082,
       hot: true,
       liveReload: true,
@@ -74,9 +77,19 @@ module.exports = (env, argv) => {
           res.json({ ok: true });
         });
 
+        // PUT /api/save-video-settings → write to public/geojson/video_settings.json
+        devServer.app.put('/api/save-video-settings', jsonParser, (req, res) => {
+          const filePath = path.join(__dirname, 'public', 'geojson', 'video_settings.json');
+          fs.writeFileSync(filePath, JSON.stringify(req.body, null, 2), 'utf-8');
+          res.json({ ok: true });
+        });
+
         // PUT /api/save-rooms/:level → write to public/geojson/eng1/eng1_room_L{level}.geojson
         devServer.app.put('/api/save-rooms/:level', jsonParser, (req, res) => {
-          const level = req.params.level;
+          const level = parseInt(req.params.level, 10);
+          if (!Number.isInteger(level) || level < 1 || level > 10) {
+            return res.status(400).json({ error: 'invalid level' });
+          }
           const filePath = path.join(__dirname, 'public', 'geojson', 'eng1', `eng1_room_L${level}.geojson`);
           fs.writeFileSync(filePath, JSON.stringify(req.body, null, 2), 'utf-8');
           res.json({ ok: true });

@@ -1,7 +1,7 @@
 // ===== Navigation Graph Editor — Main Orchestration =====
 
 import maplibregl from 'maplibre-gl';
-import { EditorMode, NavGraphExport, RoomAutoApplyPreset, RoomType } from './graphEditorTypes';
+import { EditorMode, NavEdge, NavGraphExport, RoomAutoApplyPreset, RoomType } from './graphEditorTypes';
 import * as State from './graphEditorState';
 import * as EditorMap from './graphEditorMap';
 import * as Panel from './graphEditorPanel';
@@ -9,6 +9,9 @@ import * as GeoMap from '../components/geoMap';
 import * as IndoorLayer from '../components/indoorLayer';
 import * as BackendService from '../services/backendService';
 import * as IndoorLayerModule from '../components/indoorLayer';
+import * as VideoSettings from './videoSettings';
+import { openVideoPreview } from './videoPreview';
+import { getOppositeVideo } from './videoCatalog';
 
 let state = State.createState();
 let active = false;
@@ -55,9 +58,10 @@ async function activateEditor(): Promise<void> {
   state.currentLevel = IndoorLayer.getCurrentLevel();
   lastKnownLevel = state.currentLevel;
 
-  // Load graph from file
+  // Load graph and video settings
   const saved = await State.loadGraphFromFile();
   if (saved) state.graph = saved;
+  await VideoSettings.loadVideoSettings();
 
   lastKnownFlatMode = GeoMap.isFlatMode();
 
@@ -73,6 +77,11 @@ async function activateEditor(): Promise<void> {
     onModeChange: handleModeChange,
     onNodeUpdate: handleNodeUpdate,
     onNodeDelete: handleNodeDelete,
+    onEdgeUpdate: handleEdgeUpdate,
+    onEdgeDelete: handleEdgeDelete,
+    onSetTime: handleSetTime,
+    onBatchVideoAssign: handleBatchVideoAssign,
+    onSplitAssign: handleSplitAssign,
     onRoomUpdate: handleRoomUpdate,
     onRoomExport: handleRoomExport,
     onUndo: handleUndo,
@@ -94,6 +103,9 @@ async function activateEditor(): Promise<void> {
   // Keyboard shortcuts & right-click cancel
   document.addEventListener('keydown', handleKeyDown);
   map.getCanvas().addEventListener('contextmenu', handleRightClick);
+
+  // Disable boxZoom so shift+click works for multi-edge selection
+  map.boxZoom.disable();
 
   // Prevent room popup while editing
   document.body.classList.add('editor-active');
@@ -122,6 +134,7 @@ function deactivateEditor(): void {
 
   document.removeEventListener('keydown', handleKeyDown);
   map.getCanvas().removeEventListener('contextmenu', handleRightClick);
+  map.boxZoom.enable();
   document.body.classList.remove('editor-active');
 
   const btn = document.getElementById('graphEditorToggle');
@@ -133,6 +146,7 @@ function deactivateEditor(): void {
   }
 
   selectedRoomIdx = null;
+  state.selectedEdgeId = null; state.selectedEdgeIds = [];
   autoApplyPreset = { enabled: false, roomType: '' as RoomType, refPrefix: '' };
   map = null;
 }
@@ -292,7 +306,9 @@ function handleMapClick(lngLat: [number, number]): void {
   } else if (state.mode === 'select') {
     // Clicked on empty space — deselect
     state.selectedNodeId = null;
+    state.selectedEdgeId = null; state.selectedEdgeIds = [];
     Panel.hideNodeProperties();
+    Panel.hideEdgeProperties();
     refreshMap();
   }
 }
@@ -303,6 +319,8 @@ function handleNodeClick(nodeId: string): void {
 
   if (state.mode === 'select') {
     state.selectedNodeId = nodeId;
+    state.selectedEdgeId = null; state.selectedEdgeIds = [];
+    Panel.hideEdgeProperties();
     Panel.showNodeProperties(node);
     Panel.setNodeIdData(nodeId);
     refreshMap();
@@ -340,14 +358,245 @@ function handleNodeClick(nodeId: string): void {
   }
 }
 
-function handleEdgeClick(edgeId: string): void {
+function handleEdgeClick(edgeId: string, shiftKey: boolean = false): void {
   if (state.mode === 'select') {
-    // Select edge — for now just show confirmation to delete
-    if (confirm(`엣지 "${edgeId}"를 삭제하시겠습니까?`)) {
-      State.deleteEdge(state, edgeId);
-      refreshMap();
+    const edge = state.graph.edges.find(e => e.id === edgeId);
+    if (!edge) return;
+
+    const fromNode = state.graph.nodes[edge.from];
+    const toNode = state.graph.nodes[edge.to];
+    if (!fromNode || !toNode) return;
+
+    // Deselect any selected node
+    state.selectedNodeId = null;
+    Panel.hideNodeProperties();
+
+    if (shiftKey) {
+      // Multi-select: toggle edge in selectedEdgeIds
+      const idx = state.selectedEdgeIds.indexOf(edgeId);
+      if (idx >= 0) {
+        state.selectedEdgeIds.splice(idx, 1);
+      } else {
+        state.selectedEdgeIds.push(edgeId);
+      }
+      // Also keep selectedEdgeId in sync
+      state.selectedEdgeId = state.selectedEdgeIds.length > 0
+        ? state.selectedEdgeIds[state.selectedEdgeIds.length - 1]
+        : null;
+    } else {
+      // Single select
+      state.selectedEdgeId = edgeId;
+      state.selectedEdgeIds = [edgeId];
+    }
+
+    // Show appropriate panel
+    Panel.hideEdgeProperties();
+    if (state.selectedEdgeIds.length > 1) {
+      const edges = state.selectedEdgeIds
+        .map(id => state.graph.edges.find(e => e.id === id))
+        .filter((e): e is NavEdge => !!e);
+      Panel.showMultiEdgeProperties(edges, state.graph.nodes);
+    } else if (state.selectedEdgeIds.length === 1) {
+      Panel.showEdgeProperties(edge, fromNode, toNode);
+    }
+
+    refreshMap();
+  }
+}
+
+// ===== Edge Callbacks =====
+
+function handleEdgeUpdate(edgeId: string, props: Partial<NavEdge>): void {
+  State.updateEdge(state, edgeId, props);
+  // Re-show updated properties
+  const edge = state.graph.edges.find(e => e.id === edgeId);
+  if (edge) {
+    const fromNode = state.graph.nodes[edge.from];
+    const toNode = state.graph.nodes[edge.to];
+    if (fromNode && toNode) Panel.showEdgeProperties(edge, fromNode, toNode);
+  }
+}
+
+function handleEdgeDelete(edgeId: string): void {
+  State.deleteEdge(state, edgeId);
+  state.selectedEdgeId = null; state.selectedEdgeIds = [];
+  Panel.hideEdgeProperties();
+  refreshMap();
+}
+
+function handleSetTime(edgeId: string, direction: 'fwd' | 'rev' | 'fwdExit' | 'revExit'): void {
+  const edge = state.graph.edges.find(e => e.id === edgeId);
+  if (!edge) return;
+
+  // Resolve video/start/end keys based on direction
+  const keyMap: Record<string, { video: keyof NavEdge; start: keyof NavEdge; end: keyof NavEdge }> = {
+    fwd: { video: 'videoFwd', start: 'videoFwdStart', end: 'videoFwdEnd' },
+    rev: { video: 'videoRev', start: 'videoRevStart', end: 'videoRevEnd' },
+    fwdExit: { video: 'videoFwdExit', start: 'videoFwdExitStart', end: 'videoFwdExitEnd' },
+    revExit: { video: 'videoRevExit', start: 'videoRevExitStart', end: 'videoRevExitEnd' },
+  };
+  const keys = keyMap[direction];
+
+  const videoFile = edge[keys.video] as string | undefined;
+  if (!videoFile) return;
+
+  const vsEntry = VideoSettings.getEntry(videoFile);
+  const yaw = vsEntry?.yaw ?? vsEntry?.entryYaw ?? 0;
+
+  openVideoPreview({
+    videoUrl: `/videos/${videoFile}`,
+    initialYaw: yaw,
+    mode: 'time-range',
+    initialStart: edge[keys.start] as number | undefined,
+    initialEnd: edge[keys.end] as number | undefined,
+    onConfirm: () => {},
+    onConfirmTimeRange: (start, end) => {
+      handleEdgeUpdate(edgeId, { [keys.start]: start, [keys.end]: end });
+    },
+    onCancel: () => {},
+  });
+}
+
+/**
+ * For each edge in the chain, determine the correct video key based on:
+ * - `direction`: the user's chosen chain direction (fwd/rev)
+ * - `aligned`: whether the edge's from→to matches the chain walk direction
+ *
+ * If direction=fwd and aligned=true → edge walks from→to → use videoFwd
+ * If direction=fwd and aligned=false → edge walks to→from → use videoRev
+ * If direction=rev → flip everything
+ */
+function resolveEdgeVideoKeys(direction: 'fwd' | 'rev', aligned: boolean) {
+  const effectiveFwd = (direction === 'fwd') === aligned;
+  return {
+    videoKey: effectiveFwd ? 'videoFwd' as const : 'videoRev' as const,
+    startKey: effectiveFwd ? 'videoFwdStart' as const : 'videoRevStart' as const,
+    endKey: effectiveFwd ? 'videoFwdEnd' as const : 'videoRevEnd' as const,
+  };
+}
+
+function handleBatchVideoAssign(edgeIds: string[], direction: 'fwd' | 'rev', video: string | undefined): void {
+  const chain = orderEdgeChain(edgeIds, state.graph);
+  if (!chain) return;
+
+  const opposite = video ? getOppositeVideo(video) : undefined;
+  const reverseDir: 'fwd' | 'rev' = direction === 'fwd' ? 'rev' : 'fwd';
+
+  for (const { edge, aligned } of chain) {
+    const keys = resolveEdgeVideoKeys(direction, aligned);
+    const props: Record<string, any> = { [keys.videoKey]: video };
+
+    // Auto-assign reverse direction (corridors + stairs only)
+    if (opposite) {
+      const revKeys = resolveEdgeVideoKeys(reverseDir, aligned);
+      props[revKeys.videoKey] = opposite;
+    }
+
+    State.updateEdge(state, edge.id, props);
+  }
+}
+
+function handleSplitAssign(edgeIds: string[], direction: 'fwd' | 'rev', videoFile: string): void {
+  const chain = orderEdgeChain(edgeIds, state.graph);
+  if (!chain) {
+    alert('선택된 엣지들이 연결된 경로를 형성하지 않습니다.');
+    return;
+  }
+
+  const entry = VideoSettings.getEntry(videoFile);
+  const yaw = entry?.yaw ?? 0;
+
+  // Collect existing splits — use per-edge resolved keys
+  const existingSplits: number[] = [];
+  const allHaveTimes = chain.every(({ edge, aligned }) => {
+    const keys = resolveEdgeVideoKeys(direction, aligned);
+    return edge[keys.videoKey] === videoFile
+      && edge[keys.startKey] !== undefined
+      && edge[keys.endKey] !== undefined;
+  });
+
+  if (allHaveTimes) {
+    const firstKeys = resolveEdgeVideoKeys(direction, chain[0].aligned);
+    existingSplits.push(chain[0].edge[firstKeys.startKey]!);
+    for (const { edge, aligned } of chain) {
+      const keys = resolveEdgeVideoKeys(direction, aligned);
+      existingSplits.push(edge[keys.endKey]!);
     }
   }
+
+  openVideoPreview({
+    videoUrl: `/videos/${videoFile}`,
+    initialYaw: yaw,
+    mode: 'split',
+    splitCount: chain.length,
+    initialSplits: existingSplits.length === chain.length + 1 ? existingSplits : undefined,
+    onConfirm: () => {},
+    onConfirmSplits: (splits) => {
+      for (let i = 0; i < chain.length; i++) {
+        const keys = resolveEdgeVideoKeys(direction, chain[i].aligned);
+        State.updateEdge(state, chain[i].edge.id, {
+          [keys.videoKey]: videoFile,
+          [keys.startKey]: splits[i],
+          [keys.endKey]: splits[i + 1],
+        });
+      }
+      if (state.selectedEdgeIds.length > 1) {
+        const edges = state.selectedEdgeIds
+          .map(id => state.graph.edges.find(e => e.id === id))
+          .filter((e): e is NavEdge => !!e);
+        Panel.showMultiEdgeProperties(edges, state.graph.nodes);
+      }
+      refreshMap();
+    },
+    onCancel: () => {},
+  });
+}
+
+// ===== Edge Chain Ordering =====
+
+interface ChainEdge {
+  edge: NavEdge;
+  aligned: boolean; // true if chain direction matches edge's from→to
+}
+
+function orderEdgeChain(edgeIds: string[], graph: { nodes: Record<string, any>; edges: NavEdge[] }): ChainEdge[] | null {
+  const edges = edgeIds.map(id => graph.edges.find(e => e.id === id)).filter((e): e is NavEdge => !!e);
+  if (edges.length !== edgeIds.length) return null;
+  if (edges.length === 1) return [{ edge: edges[0], aligned: true }];
+
+  // Build adjacency: node → edges that touch it
+  const nodeToEdges = new Map<string, NavEdge[]>();
+  for (const e of edges) {
+    for (const nid of [e.from, e.to]) {
+      if (!nodeToEdges.has(nid)) nodeToEdges.set(nid, []);
+      nodeToEdges.get(nid)!.push(e);
+    }
+  }
+
+  // Find endpoint nodes (touched by only 1 selected edge)
+  const endpointNodes: string[] = [];
+  for (const [nid, edgeList] of nodeToEdges) {
+    if (edgeList.length === 1) endpointNodes.push(nid);
+  }
+
+  if (endpointNodes.length !== 2) return null; // not a simple chain
+
+  // Walk the chain from first endpoint, tracking direction per edge
+  const result: ChainEdge[] = [];
+  const used = new Set<string>();
+  let currentNode = endpointNodes[0];
+
+  while (result.length < edges.length) {
+    const nextEdge = (nodeToEdges.get(currentNode) || []).find(e => !used.has(e.id));
+    if (!nextEdge) return null;
+    used.add(nextEdge.id);
+    // aligned = chain walks from→to; reversed = chain walks to→from
+    const aligned = nextEdge.from === currentNode;
+    result.push({ edge: nextEdge, aligned });
+    currentNode = aligned ? nextEdge.to : nextEdge.from;
+  }
+
+  return result;
 }
 
 // ===== Panel Callbacks =====
@@ -369,7 +618,9 @@ function handleNodeDelete(nodeId: string): void {
 function handleUndo(): void {
   if (State.undo(state)) {
     state.selectedNodeId = null;
+    state.selectedEdgeId = null; state.selectedEdgeIds = [];
     Panel.hideNodeProperties();
+    Panel.hideEdgeProperties();
     refreshMap();
   }
 }
@@ -377,7 +628,9 @@ function handleUndo(): void {
 function handleRedo(): void {
   if (State.redo(state)) {
     state.selectedNodeId = null;
+    state.selectedEdgeId = null; state.selectedEdgeIds = [];
     Panel.hideNodeProperties();
+    Panel.hideEdgeProperties();
     refreshMap();
   }
 }
@@ -423,7 +676,9 @@ function handleExport(): void {
 
 function handleClearAll(): void {
   State.clearAll(state);
+  state.selectedEdgeId = null; state.selectedEdgeIds = [];
   Panel.hideNodeProperties();
+  Panel.hideEdgeProperties();
   refreshMap();
 }
 
@@ -534,6 +789,10 @@ function handleKeyDown(e: KeyboardEvent): void {
       state.edgeStartNodeId = null;
       Panel.setEdgeHint('노드를 클릭하여 엣지 시작점을 선택하세요');
       refreshMap();
+    } else if (state.selectedEdgeId) {
+      state.selectedEdgeId = null; state.selectedEdgeIds = [];
+      Panel.hideEdgeProperties();
+      refreshMap();
     } else if (state.selectedNodeId) {
       state.selectedNodeId = null;
       Panel.hideNodeProperties();
@@ -560,6 +819,8 @@ function handleKeyDown(e: KeyboardEvent): void {
   } else if (e.key === 'Delete' || e.key === 'Backspace') {
     if (state.selectedNodeId) {
       handleNodeDelete(state.selectedNodeId);
+    } else if (state.selectedEdgeId) {
+      handleEdgeDelete(state.selectedEdgeId);
     }
   } else if (e.key === 'q' || e.key === 'Q') {
     handleModeChange('select');
@@ -603,7 +864,7 @@ function refreshMap(): void {
       IndoorLayer.ROOM_THICKNESS,
       level,
     );
-    EditorMap.updateEdgeLayer(map, [], level);
+    EditorMap.updateEdgeLayer(map, [], level, state.selectedEdgeIds);
   } else {
     // 2D mode: show only current level via circle/line layers
     EditorMap.clearFloatingNodes();
@@ -613,7 +874,7 @@ function refreshMap(): void {
     const visibleNodes = State.getNodesOnLevel(state, level);
     EditorMap.updateNodeLayer(map, visibleNodes, state.selectedNodeId, state.edgeStartNodeId);
     const visibleEdges = State.getEdgesOnLevel(state, level);
-    EditorMap.updateEdgeLayer(map, visibleEdges, level);
+    EditorMap.updateEdgeLayer(map, visibleEdges, level, state.selectedEdgeIds);
   }
 
   Panel.updateInfo(State.getNodeCount(state), State.getEdgeCount(state), level);

@@ -66,15 +66,22 @@ npm run build  # dist/ 폴더에 번들 생성
 - [x] **경로 3D 렌더링** — 3D 모드에서 각 좌표가 해당 층 높이에 정확히 표시, 2D↔3D 전환 시 자동 재렌더링
 - [x] **출발/도착 자동완성** — 방 검색 UI와 동일한 자동완성 드롭다운
 - [x] **room 노드 자동 ref** — 그래프 에디터에서 room 타입 노드 배치 시 가장 가까운 방의 ref 자동 할당
+- [x] **360° 비디오 카탈로그** — 48개 영상 (복도 30 + 계단 8 + 엘리베이터 10) 메타데이터 + 스마트 추천
+- [x] **엣지-비디오 매핑** — 엣지별 양방향(FWD/REV) 비디오 할당, 복도 cw↔ccw 자동 역방향 할당
+- [x] **비디오 시작 방향 설정** — Video Settings 패널에서 전체 영상의 초기 yaw 각도 일괄 설정 (Three.js 360° 프리뷰)
+- [x] **계단/엘리베이터 입출 영상** — 수직 이동 엣지에 들어갈 때/나올 때 2개 클립 (같은 영상 또는 다른 영상)
+- [x] **비디오 시간 범위** — 엣지별 startTime/endTime 설정 (360° 프리뷰 + 드래그 마커)
+- [x] **다중 엣지 선택** — Shift+클릭으로 여러 엣지 선택, 체인 자동 감지 + 방향 표시
+- [x] **다중 엣지 분할 할당** — Assign & Split: 한 영상을 N개 엣지에 분할점으로 나눠 할당
+- [x] **360° 프리뷰 오버레이** — 드래그 회전, 휠 줌, 재생/일시정지(스페이스바), 시크바, 마커 드래그
 
 ## 남은 작업
 
 - [ ] **3~5층 GeoJSON 데이터 제작** (QGIS → `geojson_convert/convert.py`)
 - [ ] **그래프 데이터 완성** — 전 층 노드/간선 생성 (그래프 에디터 활용)
-- [ ] **360° 비디오 촬영 및 클립 연결** — 경로 간선에 비디오 매핑
+- [ ] **엣지-비디오 매핑 완성** — 전체 엣지에 비디오/시간 할당 (그래프 에디터 활용)
 - [ ] **360° 비디오 플레이어** — 통합 시크바, 클립 전환, 마우스 회전
 - [ ] **비디오 상하 분할 뷰** — 상단 50% 비디오 + 하단 50% 지도, 전체화면 전환
-- [ ] **다국어** — 한국어 번역 파일 추가 (현재 영어/독일어만 있음)
 
 ## 핵심 파일 가이드
 
@@ -92,6 +99,10 @@ npm run build  # dist/ 폴더에 번들 생성
 | `editor/graphEditorPanel.ts` | 에디터 UI 패널 (노드·방 속성, 모드 전환) |
 | `editor/graphEditorState.ts` | 에디터 상태 관리 (undo/redo, graph.json 파일 저장) |
 | `editor/graphEditorTypes.ts` | 에디터 타입 정의 (NavNode, NavEdge, Command 등) |
+| `editor/videoCatalog.ts` | 360° 비디오 카탈로그 (48개 영상 메타데이터, 스마트 추천) |
+| `editor/videoSettings.ts` | 비디오별 초기 yaw 각도 관리 (`video_settings.json`) |
+| `editor/videoSettingsPanel.ts` | Video Settings 패널 (영상별 방향 일괄 설정) |
+| `editor/videoPreview.ts` | 360° 프리뷰 오버레이 (Three.js, yaw/time-range/split 모드) |
 | `services/backendService.ts` | GeoJSON 로딩 + 방 정보 조회 (centroid, polygon, level) |
 | `services/graphService.ts` | 경로 탐색 엔진 (Dijkstra, 문 위치 근사, corridor edge 투영) |
 | `services/apiClient.ts` | 경로 API 클라이언트 (로컬 Dijkstra ↔ 백엔드 A* 전환) |

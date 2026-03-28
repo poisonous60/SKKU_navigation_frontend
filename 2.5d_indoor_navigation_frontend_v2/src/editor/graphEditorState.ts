@@ -15,6 +15,8 @@ export function createState(): EditorState {
     graph: { nodes: {}, edges: [] },
     mode: 'select',
     selectedNodeId: null,
+    selectedEdgeId: null,
+    selectedEdgeIds: [],
     edgeStartNodeId: null,
     currentLevel: 1,
     undoStack: [],
@@ -97,6 +99,19 @@ export function deleteEdge(state: EditorState, edgeId: string): void {
   executeCmd(state, cmd);
 }
 
+export function updateEdge(state: EditorState, edgeId: string, props: Partial<NavEdge>): void {
+  const edge = state.graph.edges.find(e => e.id === edgeId);
+  if (!edge) return;
+  // Strip identity fields to prevent corruption
+  const { id: _id, from: _from, to: _to, ...safeProps } = props;
+  const before: Partial<NavEdge> = {};
+  for (const key of Object.keys(safeProps) as (keyof NavEdge)[]) {
+    (before as any)[key] = edge[key];
+  }
+  const cmd = new UpdateEdgeCmd(edgeId, before, safeProps);
+  executeCmd(state, cmd);
+}
+
 // ===== Undo / Redo =====
 
 function executeCmd(state: EditorState, cmd: Command): void {
@@ -164,7 +179,22 @@ export function exportGraph(graph: NavGraph): NavGraphExport {
   }
   return {
     nodes,
-    edges: graph.edges.map(e => ({ from: e.from, to: e.to, weight: e.weight })),
+    edges: graph.edges.map(e => {
+      const entry: NavGraphExport['edges'][number] = { from: e.from, to: e.to, weight: e.weight };
+      if (e.videoFwd) entry.videoFwd = e.videoFwd;
+      if (e.videoFwdStart !== undefined) entry.videoFwdStart = e.videoFwdStart;
+      if (e.videoFwdEnd !== undefined) entry.videoFwdEnd = e.videoFwdEnd;
+      if (e.videoFwdExit) entry.videoFwdExit = e.videoFwdExit;
+      if (e.videoFwdExitStart !== undefined) entry.videoFwdExitStart = e.videoFwdExitStart;
+      if (e.videoFwdExitEnd !== undefined) entry.videoFwdExitEnd = e.videoFwdExitEnd;
+      if (e.videoRev) entry.videoRev = e.videoRev;
+      if (e.videoRevStart !== undefined) entry.videoRevStart = e.videoRevStart;
+      if (e.videoRevEnd !== undefined) entry.videoRevEnd = e.videoRevEnd;
+      if (e.videoRevExit) entry.videoRevExit = e.videoRevExit;
+      if (e.videoRevExitStart !== undefined) entry.videoRevExitStart = e.videoRevExitStart;
+      if (e.videoRevExitEnd !== undefined) entry.videoRevExitEnd = e.videoRevExitEnd;
+      return entry;
+    }),
   };
 }
 
@@ -186,6 +216,18 @@ export function importGraph(data: NavGraphExport): NavGraph {
     from: e.from,
     to: e.to,
     weight: e.weight,
+    ...(e.videoFwd ? { videoFwd: e.videoFwd } : {}),
+    ...(e.videoFwdStart !== undefined ? { videoFwdStart: e.videoFwdStart } : {}),
+    ...(e.videoFwdEnd !== undefined ? { videoFwdEnd: e.videoFwdEnd } : {}),
+    ...(e.videoFwdExit ? { videoFwdExit: e.videoFwdExit } : {}),
+    ...(e.videoFwdExitStart !== undefined ? { videoFwdExitStart: e.videoFwdExitStart } : {}),
+    ...(e.videoFwdExitEnd !== undefined ? { videoFwdExitEnd: e.videoFwdExitEnd } : {}),
+    ...(e.videoRev ? { videoRev: e.videoRev } : {}),
+    ...(e.videoRevStart !== undefined ? { videoRevStart: e.videoRevStart } : {}),
+    ...(e.videoRevEnd !== undefined ? { videoRevEnd: e.videoRevEnd } : {}),
+    ...(e.videoRevExit ? { videoRevExit: e.videoRevExit } : {}),
+    ...(e.videoRevExitStart !== undefined ? { videoRevExitStart: e.videoRevExitStart } : {}),
+    ...(e.videoRevExitEnd !== undefined ? { videoRevExitEnd: e.videoRevExitEnd } : {}),
   }));
   return { nodes, edges };
 }
@@ -353,4 +395,16 @@ class DeleteEdgeCmd implements Command {
   constructor(private edge: NavEdge) {}
   execute(graph: NavGraph) { graph.edges = graph.edges.filter(e => e.id !== this.edge.id); }
   undo(graph: NavGraph) { graph.edges.push({ ...this.edge }); }
+}
+
+class UpdateEdgeCmd implements Command {
+  constructor(private edgeId: string, private before: Partial<NavEdge>, private after: Partial<NavEdge>) {}
+  execute(graph: NavGraph) {
+    const edge = graph.edges.find(e => e.id === this.edgeId);
+    if (edge) Object.assign(edge, this.after);
+  }
+  undo(graph: NavGraph) {
+    const edge = graph.edges.find(e => e.id === this.edgeId);
+    if (edge) Object.assign(edge, this.before);
+  }
 }

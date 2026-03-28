@@ -15,6 +15,7 @@ const LYR_EDGES_CROSS = `${PREFIX}-edges-cross`;
 const LYR_NODES_CIRCLE = `${PREFIX}-nodes-circle`;
 const LYR_NODES_SELECTED = `${PREFIX}-nodes-selected`;
 const LYR_NODES_LABELS = `${PREFIX}-nodes-labels`;
+const LYR_EDGES_HIT = `${PREFIX}-edges-hit`; // invisible wide layer for click detection
 const LYR_EDGE_START = `${PREFIX}-edge-start`;
 
 // ===== Init / Destroy =====
@@ -33,8 +34,8 @@ export function initEditorLayers(map: maplibregl.Map): void {
     source: SRC_EDGES,
     filter: ['==', ['get', 'crossFloor'], false],
     paint: {
-      'line-color': '#42A5F5',
-      'line-width': 3,
+      'line-color': ['case', ['==', ['get', 'selected'], true], '#FFD600', '#42A5F5'],
+      'line-width': ['case', ['==', ['get', 'selected'], true], 5, 3],
       'line-opacity': 0.85,
     },
   });
@@ -46,10 +47,22 @@ export function initEditorLayers(map: maplibregl.Map): void {
     source: SRC_EDGES,
     filter: ['==', ['get', 'crossFloor'], true],
     paint: {
-      'line-color': '#FF8A65',
-      'line-width': 3,
+      'line-color': ['case', ['==', ['get', 'selected'], true], '#FFD600', '#FF8A65'],
+      'line-width': ['case', ['==', ['get', 'selected'], true], 5, 3],
       'line-opacity': 0.75,
       'line-dasharray': [4, 3],
+    },
+  });
+
+  // Edge hit area — invisible wide layer for easier clicking
+  map.addLayer({
+    id: LYR_EDGES_HIT,
+    type: 'line',
+    source: SRC_EDGES,
+    paint: {
+      'line-color': 'transparent',
+      'line-width': 16,
+      'line-opacity': 0,
     },
   });
 
@@ -131,7 +144,7 @@ export function initEditorLayers(map: maplibregl.Map): void {
 }
 
 export function destroyEditorLayers(map: maplibregl.Map): void {
-  const layers = [LYR_NODES_LABELS, LYR_EDGE_START, LYR_NODES_SELECTED, LYR_NODES_CIRCLE, LYR_EDGES_CROSS, LYR_EDGES_LINE];
+  const layers = [LYR_NODES_LABELS, LYR_EDGE_START, LYR_NODES_SELECTED, LYR_NODES_CIRCLE, LYR_EDGES_HIT, LYR_EDGES_CROSS, LYR_EDGES_LINE];
   for (const id of layers) {
     if (map.getLayer(id)) map.removeLayer(id);
   }
@@ -158,7 +171,7 @@ export function updateNodeLayer(
       level: node.level,
       building: node.building,
       label: node.label,
-      displayLabel: node.label || node.type,
+      displayLabel: node.label || node.id.slice(5, 13),
       selected: node.id === selectedId,
       edgeStart: node.id === edgeStartId,
     },
@@ -175,6 +188,7 @@ export function updateEdgeLayer(
   map: maplibregl.Map,
   edgeData: { edge: NavEdge; fromNode: NavNode; toNode: NavNode }[],
   currentLevel: number,
+  selectedEdgeIds: string[] = [],
 ): void {
   const source = map.getSource(SRC_EDGES) as maplibregl.GeoJSONSource;
   if (!source) return;
@@ -199,6 +213,7 @@ export function updateEdgeLayer(
         to: edge.to,
         weight: edge.weight,
         crossFloor,
+        selected: selectedEdgeIds.includes(edge.id),
         targetLevel: crossFloor
           ? (fromNode.level === currentLevel ? toNode.level : fromNode.level)
           : null,
@@ -244,12 +259,12 @@ export function setClickHandlers(map: maplibregl.Map, callbacks: EditorMapCallba
       }
     }
 
-    // Check if an edge was clicked
-    const edgeFeatures = map.queryRenderedFeatures(e.point, { layers: [LYR_EDGES_LINE, LYR_EDGES_CROSS] });
+    // Check if an edge was clicked (use wide hit layer for easier detection)
+    const edgeFeatures = map.queryRenderedFeatures(e.point, { layers: [LYR_EDGES_HIT] });
     if (edgeFeatures.length > 0) {
       const edgeId = edgeFeatures[0].properties?.id;
       if (edgeId) {
-        callbacks.onEdgeClick(edgeId);
+        callbacks.onEdgeClick(edgeId, e.originalEvent.shiftKey);
         return;
       }
     }
@@ -265,6 +280,12 @@ export function setClickHandlers(map: maplibregl.Map, callbacks: EditorMapCallba
     map.getCanvas().style.cursor = 'pointer';
   });
   map.on('mouseleave', LYR_NODES_CIRCLE, () => {
+    map.getCanvas().style.cursor = '';
+  });
+  map.on('mouseenter', LYR_EDGES_HIT, () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', LYR_EDGES_HIT, () => {
     map.getCanvas().style.cursor = '';
   });
 }
@@ -365,7 +386,7 @@ export function set2DNodeLayersVisible(map: maplibregl.Map, visible: boolean): v
 
 export function set2DEdgeLayersVisible(map: maplibregl.Map, visible: boolean): void {
   const vis = visible ? 'visible' : 'none';
-  for (const id of [LYR_EDGES_LINE, LYR_EDGES_CROSS]) {
+  for (const id of [LYR_EDGES_LINE, LYR_EDGES_CROSS, LYR_EDGES_HIT]) {
     if (map.getLayer(id)) {
       map.setLayoutProperty(id, 'visibility', vis);
     }
@@ -441,7 +462,7 @@ export function updateFloatingNodeLayer(
     if (isInactive) el.classList.add('inactive');
     if (node.type === 'room') el.classList.add('room-node');
 
-    const labelText = node.label || node.type;
+    const labelText = node.label || node.id.slice(5, 13);
     const labelEl = document.createElement('span');
     labelEl.className = 'ge-floating-node-label';
     labelEl.textContent = labelText;
