@@ -2,22 +2,6 @@
 
 캡스톤 디자인 프로젝트 — 성균관대 자연과학캠퍼스 제1공학관 2.5D 실내 내비게이션 + 360° Walkthrough
 
-## 프로젝트 구조
-
-```
-├── 2.5d_indoor_navigation_frontend_v2/   # 메인 프론트엔드 앱 (TypeScript + MapLibre GL + deck.gl)
-├── Geojson/                              # QGIS 원본 데이터 (방, 벽, 외곽선, 충돌체)
-├── geojson_convert/                      # QGIS → 앱용 GeoJSON 변환 파이프라인
-├── cad/                                  # CAD 참조 도구 (DXF/SVG 변환, QGIS 가이드)
-├── buildings/                            # 건물 구조 데이터 (eng1.json)
-├── reference/                            # UI/디자인 레퍼런스 이미지
-├── SKKU_building_structure diagram/      # 건물 도면 원본 (JPG)
-├── SKKU_building_structure diagram_resize/ # 건물 도면 리사이즈
-├── sample_video/                         # 360° 샘플 영상
-├── docs/                                 # 설계 문서 (DESIGN.md, BUILDING_CODES.md 등)
-└── CLAUDE.md                             # Claude Code 프로젝트 지침
-```
-
 ## 빠른 시작
 
 ```bash
@@ -37,6 +21,9 @@ npm run build  # dist/ 폴더에 번들 생성
 그래프 에디터에서 엣지에 영상을 할당하거나, Walkthrough 재생을 하려면 360° 영상 파일이 필요하다.
 
 1. 공유 드라이브에서 `eng1_mp4/` 폴더를 받는다 (48개 mp4, 약 1.2GB)
+https://drive.google.com/file/d/10toUrH2QPkQCoq1o22d0djIxiuP59Muh/view?usp=sharing
+
+
 2. `2.5d_indoor_navigation_frontend_v2/videos/` 에 넣는다
 
 ```
@@ -49,8 +36,26 @@ npm run build  # dist/ 폴더에 번들 생성
     └── ... (48개)
 ```
 
-`videos/` 폴더는 `.gitignore`에 등록되어 있어 커밋되지 않는다.
 영상 네이밍 규칙과 엣지 매핑 방법은 `docs/360-video-guide.md` 참조.
+
+
+## 프로젝트 구조
+
+```
+├── 2.5d_indoor_navigation_frontend_v2/   # 메인 프론트엔드 앱 (TypeScript + MapLibre GL + deck.gl)
+├── Geojson/                              # QGIS 원본 데이터 (방, 벽, 외곽선, 충돌체)
+├── geojson_convert/                      # QGIS → 앱용 GeoJSON 변환 파이프라인
+├── cad/                                  # CAD 참조 도구 (DXF/SVG 변환, QGIS 가이드)
+├── buildings/                            # 건물 구조 데이터 (eng1.json)
+├── reference/                            # UI/디자인 레퍼런스 이미지
+├── SKKU_building_structure diagram/      # 건물 도면 원본 (JPG)
+├── SKKU_building_structure diagram_resize/ # 건물 도면 리사이즈
+├── sample_video/                         # 360° 샘플 영상
+├── docs/                                 # 설계 문서 (DESIGN.md, BUILDING_CODES.md 등)
+└── CLAUDE.md                             # Claude Code 프로젝트 지침
+```
+
+
 
 ## 아키텍처
 
