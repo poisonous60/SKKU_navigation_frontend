@@ -169,3 +169,13 @@ Floor selector: 좌측 투명 휠 UI (드래그/스크롤로 층 전환)
 3. 다국어 (한국어 전용)
 4. 복잡한 온보딩
 5. 오프라인 모드
+
+---
+
+## 주요 설계 결정
+
+- **벽만 merge, 방은 그룹화**: 벽은 BufferGeometry merge로 ~1개 draw call, 방 바닥은 room_type별 ~10개 그룹
+- **MeshStandardMaterial**: metalness 0.1, roughness 0.85 (AmbientLight 0.6 + DirectionalLight 0.8)
+- **VideoTexture**: 클립 전환 시 반드시 `.dispose()` 호출 (메모리 누수 방지)
+- **색상**: 위 ROOM_COLORS 룩업 테이블 기준
+- **MapLibre → deck.gl**: v1 Maptalks에서 MapLibre GL + deck.gl로 렌더링 스택 변경 (v2)

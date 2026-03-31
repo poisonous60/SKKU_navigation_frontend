@@ -14,6 +14,12 @@ let adjacency: Map<string, { nodeId: string; weight: number }[]> = new Map();
 
 // ===== Loading =====
 
+/** Replace graph data (used by API provider that fetches graph from backend) */
+export function setGraph(newGraph: NavGraph): void {
+  graph = newGraph;
+  buildAdjacency();
+}
+
 export async function loadGraph(): Promise<void> {
   try {
     const res = await fetch(GRAPH_JSON_URL);
@@ -116,7 +122,7 @@ export function findNearestNode(coords: [number, number], level: number): string
 }
 
 /** Find the nearest corridor/stairs node (room 타입 제외) */
-function findNearestCorridorNode(coords: [number, number], level: number): string | null {
+export function findNearestCorridorNode(coords: [number, number], level: number): string | null {
   if (!graph) return null;
 
   let bestId: string | null = null;
@@ -146,7 +152,7 @@ function findNearestCorridorNode(coords: [number, number], level: number): strin
  *   복도 방향 벽보다 가깝게 잡혀 문이 건물 밖으로 향할 수 있음.
  *   선분 거리는 물리적으로 복도를 향하는 벽을 정확히 찾아냄.
  */
-function findDoorPoint(polygon: number[][], corridorNodeCoords: [number, number]): [number, number] {
+export function findDoorPoint(polygon: number[][], corridorNodeCoords: [number, number]): [number, number] {
   let bestMidpoint: [number, number] = [polygon[0][0], polygon[0][1]];
   let bestDist = Infinity;
 
@@ -271,7 +277,7 @@ export interface EdgeProjection {
  * 좌표에서 가장 가까운 corridor edge 위에 수직 투영 (수선의 발).
  * door에서 복도로 수직 진입하는 자연스러운 경로를 만듦.
  */
-function projectOntoNearestEdge(coords: [number, number], level: number): EdgeProjection | null {
+export function projectOntoNearestEdge(coords: [number, number], level: number): EdgeProjection | null {
   if (!graph) return null;
 
   let best: EdgeProjection | null = null;
@@ -508,11 +514,12 @@ export function buildFullRoute(fromRef: string, toRef: string): FullRouteResult 
     );
   }
 
-  if (sameEdge) {
-    // Same edge: single edge from projection endpoints
+  if (sameEdge || trimmedPath.length === 0) {
+    // Same edge or trimmed to empty (both ends on adjacent edges) — single edge
     const e = findEdge(fromProj.nodeA, fromProj.nodeB);
     if (e) edgePath.push({ edge: e, forward: true, fromNode: graph!.nodes[e.from], toNode: graph!.nodes[e.to] }); // direction resolved in planner
-  } else if (trimmedPath.length > 0) {
+  } else {
+    // trimmedPath.length > 0 guaranteed here
     // Start edge: from perpFoot → first trimmed node
     const firstNode = trimmedPath[0];
     const startEdge = findEdge(fromProj.nodeA, fromProj.nodeB);
@@ -532,7 +539,7 @@ export function buildFullRoute(fromRef: string, toRef: string): FullRouteResult 
     // End edge: last trimmed node → perpFoot (only if different from start edge)
     const lastNode = trimmedPath[trimmedPath.length - 1];
     const endEdge = findEdge(toProj.nodeA, toProj.nodeB);
-    if (endEdge && endEdge !== startEdge) {
+    if (endEdge && endEdge.id !== startEdge?.id) {
       edgePath.push({ edge: endEdge, forward: endEdge.from === lastNode, fromNode: graph!.nodes[endEdge.from], toNode: graph!.nodes[endEdge.to] });
     }
   }

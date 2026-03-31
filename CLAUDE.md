@@ -16,10 +16,10 @@ When I ask you to korean, you should asnwer me to english. Korean is 7 times exp
 - **디자인 원본**: `~/.gstack/projects/skku-indoor-nav/poiso-unknown-design-20260326-165933.md`
 
 ### Architecture Summary
-- Frontend: Maptalks + 2.5D-Indoor-Maps + Three.js (기존 코드: `Maptalk-test/`)
-- Backend: Java Spring Boot (A* pathfinding, 임형준 담당)
-- 360° Video: Three.js SphereGeometry + VideoTexture (프로토타입: `360-test/`)
-- API: GET /api/route?from={nodeId}&to={nodeId} → path + edges + clip list
+- Frontend: MapLibre GL v4 + deck.gl v9 + Three.js (코드: `2.5d_indoor_navigation_frontend_v2/`)
+- Backend: Java Spring Boot (Dijkstra pathfinding, 임형준 담당)
+- 360° Video: Three.js SphereGeometry + VideoTexture
+- API: GET /api/route?from={방번호}&to={방번호} → path + edges + clip list
 
 ### Critical Decisions
 - 벽만 BufferGeometry merge, 방 바닥은 room_type별 그룹화 (draw calls ~10)

@@ -55,24 +55,41 @@ export function buildWalkthroughPlaylist(
 
       if (isVerticalStairs || isVerticalElev) {
         // === Auto-computed vertical edge ===
-        const fNode = forward ? fromNode : toNode;
-        const tNode = forward ? toNode : fromNode;
-        const vId = fNode.verticalId ?? tNode.verticalId;
-        if (vId === undefined) continue; // can't compute without verticalId
-        const building = fNode.building || tNode.building;
+        // Group consecutive vertical edges of the same type & verticalId
+        // and only emit the first entry clip + last exit clip.
+        const vertType = isVerticalStairs ? 'stairs' : 'elevator';
+        const fNode0 = forward ? fromNode : toNode;
+        const tNode0 = forward ? toNode : fromNode;
+        const vId = fNode0.verticalId ?? tNode0.verticalId;
+        if (vId === undefined) continue;
+        const building = fNode0.building || tNode0.building;
 
-        const result = isVerticalStairs
-          ? computeStairVideos(building, vId, fNode.level, tNode.level)
-          : computeElevatorVideos(building, vId, fNode.level, tNode.level);
+        // Look ahead for consecutive vertical edges of the same type/id
+        let groupEnd = i;
+        for (let j = i + 1; j < edgePath.length; j++) {
+          const ej = edgePath[j];
+          const fj = ej.fromNode;
+          const tj = ej.toNode;
+          const sameStairs = fj.type === 'stairs' && tj.type === 'stairs' && vertType === 'stairs';
+          const sameElev = fj.type === 'elevator' && tj.type === 'elevator' && vertType === 'elevator';
+          if (!sameStairs && !sameElev) break;
+          const ejVid = fj.verticalId ?? tj.verticalId;
+          if (ejVid !== vId) break;
+          groupEnd = j;
+        }
+
+        // First edge in group → entry clip
+        const firstResult = isVerticalStairs
+          ? computeStairVideos(building, vId, fNode0.level, tNode0.level)
+          : computeElevatorVideos(building, vId, fNode0.level, tNode0.level);
 
         const clipDur = isVerticalStairs ? STAIR_CLIP_DURATION : ELEVATOR_CLIP_DURATION;
         const level = route.levels[edgeCoordStart] ?? route.startLevel;
 
-        // Entry clip (entire file)
-        const entrySettings = VideoSettings.getEntry(result.entryVideo);
+        const entrySettings = VideoSettings.getEntry(firstResult.entryVideo);
         const entryYaw = entrySettings?.yaw ?? entrySettings?.entryYaw ?? 0;
         rawClips.push({
-          videoFile: result.entryVideo,
+          videoFile: firstResult.entryVideo,
           videoStart: 0,
           videoEnd: clipDur,
           duration: clipDur,
@@ -86,24 +103,37 @@ export function buildWalkthroughPlaylist(
           routeDistEnd: cumulativeDist[edgeCoordEnd],
         });
 
-        // Exit clip (entire file, on arrival floor)
-        const exitSettings = VideoSettings.getEntry(result.exitVideo);
+        // Last edge in group → exit clip
+        const lastEntry = edgePath[groupEnd];
+        const lastFwd = lastEntry.forward;
+        const lastFNode = lastFwd ? lastEntry.fromNode : lastEntry.toNode;
+        const lastTNode = lastFwd ? lastEntry.toNode : lastEntry.fromNode;
+        const lastCoordEnd = getEdgeCoordEnd(groupEnd, edgePath, nodeToCoord, videoEndCoordIdx);
+
+        const lastResult = isVerticalStairs
+          ? computeStairVideos(building, vId, lastFNode.level, lastTNode.level)
+          : computeElevatorVideos(building, vId, lastFNode.level, lastTNode.level);
+
+        const exitSettings = VideoSettings.getEntry(lastResult.exitVideo);
         const exitYaw = exitSettings?.yaw ?? exitSettings?.exitYaw ?? 0;
-        const exitLevel = route.levels[edgeCoordEnd] ?? level;
+        const exitLevel = route.levels[lastCoordEnd] ?? level;
         rawClips.push({
-          videoFile: result.exitVideo,
+          videoFile: lastResult.exitVideo,
           videoStart: 0,
           videoEnd: clipDur,
           duration: clipDur,
           yaw: exitYaw,
           level: exitLevel,
           isExitClip: true,
-          edgeId: edge.id,
-          coordStartIdx: edgeCoordEnd,
-          coordEndIdx: edgeCoordEnd,
-          routeDistStart: cumulativeDist[edgeCoordEnd],
-          routeDistEnd: cumulativeDist[edgeCoordEnd],
+          edgeId: lastEntry.edge.id,
+          coordStartIdx: lastCoordEnd,
+          coordEndIdx: lastCoordEnd,
+          routeDistStart: cumulativeDist[lastCoordEnd],
+          routeDistEnd: cumulativeDist[lastCoordEnd],
         });
+
+        // Skip the grouped edges
+        i = groupEnd;
       } else {
         // === Corridor edge — use stored edge video data with time slicing ===
         const videoFile = forward ? edge.videoFwd : edge.videoRev;

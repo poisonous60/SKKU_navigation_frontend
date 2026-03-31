@@ -33,6 +33,14 @@ let buildingDescription = '';
 let roomList: RoomListItem[] = [];
 let mapCenter: [number, number] = [126.9766, 37.2939];
 
+// ===== GeoJSON Base URL (configurable for future /api/geojson support) =====
+
+let geojsonBase = '/geojson';
+
+export function setGeojsonBase(base: string): void {
+  geojsonBase = base;
+}
+
 // ===== Fetching =====
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -47,7 +55,7 @@ const emptyFC = (): GeoJSON.FeatureCollection => ({ type: 'FeatureCollection', f
 
 export async function fetchBackendData(): Promise<void> {
   // 1. Discover available buildings
-  const codes = await fetchJson<string[]>('/geojson/buildings.json');
+  const codes = await fetchJson<string[]>(`${geojsonBase}/buildings.json`);
   if (!codes || codes.length === 0) throw new Error('buildings.json 로딩 실패');
   buildingCodes = codes;
 
@@ -108,7 +116,7 @@ export async function fetchBackendData(): Promise<void> {
 }
 
 async function loadBuilding(code: string): Promise<void> {
-  const base = `/geojson/${code}`;
+  const base = `${geojsonBase}/${code}`;
 
   // Manifest
   const m = await fetchJson<BuildingManifest>(`${base}/manifest.json`);

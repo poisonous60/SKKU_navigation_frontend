@@ -1,39 +1,44 @@
-import { RouteResponse } from '../models/types';
-import * as GraphService from './graphService';
+// ===== API Client — Manager/switch between local and API route providers =====
 
-const API_BASE = '/api';
-let useMock = true;
+import * as LocalRoute from './local/localRoute';
+import * as ApiRoute from './api/apiRoute';
+import type { FullRouteResult } from './graphService';
+import type { RoomListItem } from '../models/types';
 
-export function setUseMock(mock: boolean): void {
-  useMock = mock;
+// Set to true before calling initRouting() to use the backend API.
+// Example: import { setUseApi } from './apiClient'; setUseApi(true);
+// Can also be wired to a build-time env variable or runtime config toggle.
+let useApi = false;
+
+export function setUseApi(api: boolean): void {
+  useApi = api;
 }
 
-export async function fetchRoute(from: string, to: string): Promise<RouteResponse> {
-  if (useMock) return getLocalRoute(from, to);
-
-  const res = await fetch(`${API_BASE}/route?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
-  if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
-  return await res.json() as RouteResponse;
+export function isApiMode(): boolean {
+  return useApi;
 }
 
-function getLocalRoute(from: string, to: string): RouteResponse {
-  if (!GraphService.isLoaded()) {
-    throw new Error('그래프 데이터가 로딩되지 않았습니다.');
+/** Initialize routing: load graph from local file or backend API */
+export async function initRouting(): Promise<void> {
+  if (useApi) {
+    await ApiRoute.init();
+  } else {
+    await LocalRoute.init();
   }
+}
 
-  const result = GraphService.buildFullRoute(from, to);
-  if (!result) {
-    throw new Error(`경로를 찾을 수 없습니다: ${from} → ${to}`);
+/** Find route between two room refs */
+export async function fetchRoute(from: string, to: string): Promise<FullRouteResult | null> {
+  if (useApi) {
+    return ApiRoute.findRoute(from, to);
   }
+  return LocalRoute.findRoute(from, to);
+}
 
-  return {
-    path: result.pathNodeIds,
-    edges: [],
-    totalDistance: result.totalDistance,
-    estimatedTime: result.estimatedTime,
-    coordinates: result.coordinates,
-    levels: result.levels,
-    startLevel: result.startLevel,
-    endLevel: result.endLevel,
-  };
+/** Search rooms by query string */
+export async function searchRooms(query: string): Promise<RoomListItem[]> {
+  if (useApi) {
+    return ApiRoute.searchRooms(query);
+  }
+  return LocalRoute.searchRooms(query);
 }

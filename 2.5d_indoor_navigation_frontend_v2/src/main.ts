@@ -5,13 +5,17 @@ import * as BackendService from './services/backendService';
 import * as GeoMap from './components/geoMap';
 import * as IndoorLayer from './components/indoorLayer';
 import * as RouteOverlay from './components/routeOverlay';
-import * as GraphService from './services/graphService';
-import { fetchRoute } from './services/apiClient';
+import { fetchRoute, initRouting, searchRooms as apiSearchRooms } from './services/apiClient';
 import { ROOM_TYPE_LABELS, RoomListItem } from './models/types';
 import { setupGraphEditor } from './editor/graphEditor';
 import * as VideoSettings from './editor/videoSettings';
 import { buildWalkthroughPlaylist } from './services/walkthroughPlanner';
 import * as WalkthroughOverlay from './components/walkthroughOverlay';
+
+// ===== Helpers =====
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 // ===== Route 3D sync =====
 function syncRoute3D(): void {
@@ -24,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     await Promise.all([
       BackendService.fetchBackendData(),
-      GraphService.loadGraph(),
+      initRouting(),
       VideoSettings.loadVideoSettings(),
     ]);
     GeoMap.initMap();
@@ -67,7 +71,7 @@ function hideLoading(): void {
 function showError(msg: string): void {
   const overlay = document.getElementById('loadingOverlay');
   if (overlay) {
-    overlay.innerHTML = `<p style="color:#ef5350;">${msg}</p>`;
+    overlay.innerHTML = `<p style="color:#ef5350;">${escapeHtml(msg)}</p>`;
   }
 }
 
@@ -168,9 +172,11 @@ function setupRoomSearch(): void {
   let highlightIdx = -1;
   let currentResults: RoomListItem[] = [];
 
-  input.addEventListener('input', () => {
+  input.addEventListener('input', async () => {
     const query = input.value.trim();
-    currentResults = BackendService.searchRooms(query);
+    const results = await apiSearchRooms(query);
+    if (input.value.trim() !== query) return; // stale response — input changed during fetch
+    currentResults = results;
     highlightIdx = -1;
 
     if (currentResults.length === 0) {
@@ -182,8 +188,8 @@ function setupRoomSearch(): void {
       const typeLabel = ROOM_TYPE_LABELS[r.roomType] ?? r.roomType;
       const levelStr = r.level.join(',');
       return `<div class="autocomplete-item" data-index="${i}">
-        <span class="room-ref">${r.ref}</span>
-        <span class="room-meta">${levelStr}F ${typeLabel}${r.name ? ` · ${r.name}` : ''}</span>
+        <span class="room-ref">${escapeHtml(r.ref)}</span>
+        <span class="room-meta">${levelStr}F ${escapeHtml(typeLabel)}${r.name ? ` · ${escapeHtml(r.name)}` : ''}</span>
       </div>`;
     }).join('');
 
@@ -260,7 +266,7 @@ function setupRouteUI(): void {
       const visible = routeInputs.style.display !== 'none';
       routeInputs.style.display = visible ? 'none' : 'flex';
       toggleBtn.classList.toggle('active', !visible);
-      if (toggleBtn) toggleBtn.style.display = visible ? '' : 'none';
+      toggleBtn.style.display = visible ? '' : 'none';
     }
   });
 
@@ -301,30 +307,29 @@ function setupRouteUI(): void {
     if (!from || !to) return;
 
     try {
-      const route = await fetchRoute(from, to);
+      const fullResult = await fetchRoute(from, to);
+      if (!fullResult) {
+        console.warn('[Route] No route found:', from, '→', to);
+        return;
+      }
 
       RouteOverlay.clearEndpointPreview();
-      if (route.coordinates && route.coordinates.length >= 2) {
+      if (fullResult.coordinates.length >= 2) {
         RouteOverlay.showRoute(
-          route.coordinates,
-          route.levels ?? null,
+          fullResult.coordinates,
+          fullResult.levels,
           !GeoMap.isFlatMode(),
         );
       }
 
-      showRouteInfo(route.estimatedTime, route.totalDistance);
+      showRouteInfo(fullResult.estimatedTime, fullResult.totalDistance);
 
       // Build walkthrough video overlay
-      const fullResult = GraphService.buildFullRoute(from, to);
-      if (fullResult) {
-        console.log('[Walkthrough] edgePath:', fullResult.edgePath.length, 'edges, trimmedPath:', fullResult.trimmedPathNodeIds.length, 'nodes');
-        const playlist = buildWalkthroughPlaylist(fullResult);
-        console.log('[Walkthrough] playlist:', playlist ? `${playlist.clips.length} clips, ${playlist.totalDuration.toFixed(1)}s` : 'null');
-        if (playlist && playlist.clips.length > 0) {
-          WalkthroughOverlay.showWalkthroughOverlay(playlist);
-        }
-      } else {
-        console.warn('[Walkthrough] buildFullRoute returned null');
+      console.log('[Walkthrough] edgePath:', fullResult.edgePath.length, 'edges, trimmedPath:', fullResult.trimmedPathNodeIds.length, 'nodes');
+      const playlist = buildWalkthroughPlaylist(fullResult);
+      console.log('[Walkthrough] playlist:', playlist ? `${playlist.clips.length} clips, ${playlist.totalDuration.toFixed(1)}s` : 'null');
+      if (playlist && playlist.clips.length > 0) {
+        WalkthroughOverlay.showWalkthroughOverlay(playlist);
       }
     } catch (err: any) {
       console.error('경로 검색 실패:', err);
@@ -351,9 +356,11 @@ function setupRouteAutocomplete(input: HTMLInputElement, dropdownId: string, onS
   let highlightIdx = -1;
   let currentResults: RoomListItem[] = [];
 
-  input.addEventListener('input', () => {
+  input.addEventListener('input', async () => {
     const query = input.value.trim();
-    currentResults = BackendService.searchRooms(query);
+    const results = await apiSearchRooms(query);
+    if (input.value.trim() !== query) return; // stale response — input changed during fetch
+    currentResults = results;
     highlightIdx = -1;
 
     if (currentResults.length === 0) {
@@ -365,8 +372,8 @@ function setupRouteAutocomplete(input: HTMLInputElement, dropdownId: string, onS
       const typeLabel = ROOM_TYPE_LABELS[r.roomType] ?? r.roomType;
       const levelStr = r.level.join(',');
       return `<div class="autocomplete-item" data-index="${i}">
-        <span class="room-ref">${r.ref}</span>
-        <span class="room-meta">${levelStr}F ${typeLabel}${r.name ? ` · ${r.name}` : ''}</span>
+        <span class="room-ref">${escapeHtml(r.ref)}</span>
+        <span class="room-meta">${levelStr}F ${escapeHtml(typeLabel)}${r.name ? ` · ${escapeHtml(r.name)}` : ''}</span>
       </div>`;
     }).join('');
 

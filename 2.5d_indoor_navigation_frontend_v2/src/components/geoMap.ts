@@ -69,6 +69,8 @@ export function initMap(): void {
   // Middle-click (wheel button) drag to pan
   setupMiddleClickPan(map);
 
+  initRoomInfoPopup();
+
   map.on('load', () => {
     try {
       IndoorLayer.addIndoorLayers(map!);
@@ -255,6 +257,43 @@ function showRoomInfoPopup(ref: string, feature: GeoJSON.Feature, center: number
 function hideRoomInfoPopup(): void {
   const popup = document.getElementById('roomInfoPopup');
   if (popup) popup.style.display = 'none';
+}
+
+function initRoomInfoPopup(): void {
+  const popup = document.getElementById('roomInfoPopup');
+  const closeBtn = document.getElementById('roomInfoClose');
+  if (!popup) return;
+
+  // Close button
+  closeBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideRoomInfoPopup();
+  });
+
+  // Drag logic
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  popup.addEventListener('mousedown', (e) => {
+    if ((e.target as HTMLElement).id === 'roomInfoClose') return;
+    dragging = true;
+    offsetX = e.clientX - popup.getBoundingClientRect().left;
+    offsetY = e.clientY - popup.getBoundingClientRect().top;
+    popup.classList.add('dragging');
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    popup.style.left = `${e.clientX - offsetX}px`;
+    popup.style.top = `${e.clientY - offsetY}px`;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    popup.classList.remove('dragging');
+  });
 }
 
 function getRoomTypeLabel(type: string): string {
