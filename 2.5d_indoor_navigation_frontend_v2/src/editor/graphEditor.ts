@@ -12,6 +12,7 @@ import * as IndoorLayerModule from '../components/indoorLayer';
 import * as VideoSettings from './videoSettings';
 import { openVideoPreview } from './videoPreview';
 import { getOppositeVideo } from './videoCatalog';
+import * as RoomCodeLookup from './roomCodeLookup';
 
 let state = State.createState();
 let active = false;
@@ -58,10 +59,11 @@ async function activateEditor(): Promise<void> {
   state.currentLevel = IndoorLayer.getCurrentLevel();
   lastKnownLevel = state.currentLevel;
 
-  // Load graph and video settings
+  // Load graph, video settings, and room code lookup
   const saved = await State.loadGraphFromFile();
   if (saved) state.graph = saved;
   await VideoSettings.loadVideoSettings();
+  RoomCodeLookup.loadRoomCodes(); // non-blocking
 
   lastKnownFlatMode = GeoMap.isFlatMode();
 
@@ -215,6 +217,7 @@ function setupRoomClickListener(): void {
               _idx: updated.properties._idx,
               _area_m2: updated.properties._area_m2,
               ref: updated.properties.ref,
+              name: updated.properties.name,
               room_type: updated.properties.room_type,
             });
           }
@@ -223,6 +226,7 @@ function setupRoomClickListener(): void {
             _idx: props._idx,
             _area_m2: props._area_m2,
             ref: props.ref,
+            name: props.name,
             room_type: props.room_type,
           });
         }
@@ -709,7 +713,7 @@ function saveRoomData(level: number): void {
   }).catch(err => console.warn('[GraphEditor] room save error:', err));
 }
 
-function handleRoomUpdate(featureIdx: number, props: { ref?: string; room_type?: string }): void {
+function handleRoomUpdate(featureIdx: number, props: { ref?: string; name?: string; room_type?: string }): void {
   if (!map) return;
 
   const rooms = BackendService.getRoomFeaturesForLevel(state.currentLevel);
@@ -717,6 +721,7 @@ function handleRoomUpdate(featureIdx: number, props: { ref?: string; room_type?:
   if (!feature) return;
 
   if (props.ref !== undefined) feature.properties.ref = props.ref;
+  if (props.name !== undefined) feature.properties.name = props.name;
   if (props.room_type !== undefined) feature.properties.room_type = props.room_type;
 
   IndoorLayerModule.refreshRoomLabels(map, state.currentLevel);
@@ -735,6 +740,7 @@ function appendToRoomRef(featureIdx: number, digit: string): void {
   Panel.updateRoomRefInput(newRef);
   IndoorLayerModule.refreshRoomLabels(map, state.currentLevel);
   saveRoomData(state.currentLevel);
+  tryAutoLookup(featureIdx, newRef);
 }
 
 function backspaceRoomRef(featureIdx: number): void {
@@ -748,6 +754,28 @@ function backspaceRoomRef(featureIdx: number): void {
   const newRef = currentRef.slice(0, -1);
   feature.properties.ref = newRef;
   Panel.updateRoomRefInput(newRef);
+  IndoorLayerModule.refreshRoomLabels(map, state.currentLevel);
+  saveRoomData(state.currentLevel);
+  tryAutoLookup(featureIdx, newRef);
+}
+
+function tryAutoLookup(featureIdx: number, ref: string): void {
+  const autoLookupToggle = document.getElementById('geRoomAutoLookup') as HTMLInputElement;
+  if (!autoLookupToggle?.checked) return;
+
+  if (!map) return;
+  const entry = RoomCodeLookup.lookup(ref);
+
+  const rooms = BackendService.getRoomFeaturesForLevel(state.currentLevel);
+  const feature = rooms.find(f => f.properties._idx === featureIdx);
+  if (!feature) return;
+
+  feature.properties.name = entry ? entry.name : '';
+  feature.properties.room_type = entry ? entry.room_type : '';
+
+  Panel.updateRoomNameInput(entry ? entry.name : '');
+  Panel.updateRoomTypeSelect(entry ? entry.room_type : '');
+
   IndoorLayerModule.refreshRoomLabels(map, state.currentLevel);
   saveRoomData(state.currentLevel);
 }

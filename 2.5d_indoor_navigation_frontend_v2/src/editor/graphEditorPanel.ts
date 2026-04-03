@@ -4,6 +4,7 @@ import { NavNode, NavEdge, EditorMode, PanelCallbacks, ALL_NODE_TYPES, NODE_TYPE
 import { suggestVideosForEdge, getAllVideos, getOppositeVideo, type VideoEntry } from './videoCatalog';
 import { openVideoSettingsPanel } from './videoSettingsPanel';
 import { computeStairVideos, computeElevatorVideos } from '../utils/verticalVideoFilename';
+import * as RoomCodeLookup from './roomCodeLookup';
 
 let panelEl: HTMLElement | null = null;
 let callbacks: PanelCallbacks | null = null;
@@ -215,6 +216,17 @@ export function createPanel(cb: PanelCallbacks): HTMLElement {
           <label>Ref</label>
           <input type="text" id="geRoomRef" class="ge-input" placeholder="방 번호" />
         </div>
+        <div class="ge-prop-row" style="justify-content:space-between">
+          <label>자동 조회</label>
+          <label class="ge-toggle-switch">
+            <input type="checkbox" id="geRoomAutoLookup" checked />
+            <span class="ge-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="ge-prop-row">
+          <label>Name</label>
+          <input type="text" id="geRoomName" class="ge-input" placeholder="방 이름" />
+        </div>
         <div class="ge-prop-row">
           <label>Type</label>
           <select id="geRoomType" class="ge-select">
@@ -360,12 +372,15 @@ export function getAddNodeType(): NavNodeType {
   return (sel?.value as NavNodeType) || 'corridor';
 }
 
-export function showRoomProperties(props: { _idx?: number; _area_m2?: number; ref?: string; room_type?: string }): void {
+export function showRoomProperties(props: { _idx?: number; _area_m2?: number; ref?: string; name?: string; room_type?: string }): void {
   setText('geRoomIdx', String(props._idx ?? '?'));
   setText('geRoomArea', `${props._area_m2 ?? 0} m²`);
 
   const refInput = document.getElementById('geRoomRef') as HTMLInputElement;
   if (refInput) refInput.value = props.ref ?? '';
+
+  const nameInput = document.getElementById('geRoomName') as HTMLInputElement;
+  if (nameInput) nameInput.value = props.name ?? '';
 
   const typeSelect = document.getElementById('geRoomType') as HTMLSelectElement;
   if (typeSelect) typeSelect.value = props.room_type ?? '';
@@ -378,6 +393,16 @@ export function showRoomProperties(props: { _idx?: number; _area_m2?: number; re
 export function updateRoomRefInput(ref: string): void {
   const refInput = document.getElementById('geRoomRef') as HTMLInputElement;
   if (refInput) refInput.value = ref;
+}
+
+export function updateRoomNameInput(name: string): void {
+  const nameInput = document.getElementById('geRoomName') as HTMLInputElement;
+  if (nameInput) nameInput.value = name;
+}
+
+export function updateRoomTypeSelect(roomType: string): void {
+  const typeSelect = document.getElementById('geRoomType') as HTMLSelectElement;
+  if (typeSelect) typeSelect.value = roomType;
 }
 
 export function showEdgeProperties(edge: NavEdge, fromNode: NavNode, toNode: NavNode): void {
@@ -840,11 +865,38 @@ function wireEvents(): void {
     }
   });
 
-  // Room ref change
+  // Room ref change (with auto-lookup)
   document.getElementById('geRoomRef')?.addEventListener('change', (e) => {
     const idx = parseInt(document.getElementById('geRoomProps')?.dataset.featureIdx ?? '');
+    if (isNaN(idx)) return;
+
+    const ref = (e.target as HTMLInputElement).value;
+    const autoLookupToggle = document.getElementById('geRoomAutoLookup') as HTMLInputElement;
+    const autoLookupEnabled = autoLookupToggle?.checked ?? true;
+
+    if (autoLookupEnabled) {
+      const entry = RoomCodeLookup.lookup(ref);
+      const nameInput = document.getElementById('geRoomName') as HTMLInputElement;
+      const typeSelect = document.getElementById('geRoomType') as HTMLSelectElement;
+      if (entry) {
+        if (nameInput) nameInput.value = entry.name;
+        if (typeSelect) typeSelect.value = entry.room_type;
+        callbacks?.onRoomUpdate(idx, { ref, name: entry.name, room_type: entry.room_type });
+      } else {
+        if (nameInput) nameInput.value = '';
+        if (typeSelect) typeSelect.value = '';
+        callbacks?.onRoomUpdate(idx, { ref, name: '', room_type: '' });
+      }
+      return;
+    }
+    callbacks?.onRoomUpdate(idx, { ref });
+  });
+
+  // Room name change
+  document.getElementById('geRoomName')?.addEventListener('change', (e) => {
+    const idx = parseInt(document.getElementById('geRoomProps')?.dataset.featureIdx ?? '');
     if (!isNaN(idx)) {
-      callbacks?.onRoomUpdate(idx, { ref: (e.target as HTMLInputElement).value });
+      callbacks?.onRoomUpdate(idx, { name: (e.target as HTMLInputElement).value });
     }
   });
 
