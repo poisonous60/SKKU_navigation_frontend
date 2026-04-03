@@ -10,7 +10,7 @@
 ## 설계 원칙
 
 1. **프론트엔드에 그래프 없음** — `graph.json`, 노드/엣지 정보를 프론트엔드에 전달하지 않는다.
-2. **좌표 기반 API** — 방 번호가 아닌 좌표(lng, lat, level)로 경로를 요청한다. 방 번호 검색 시에도 centroid 좌표를 함께 반환하여 바로 경로 API에 사용할 수 있게 한다.
+2. **좌표 기반 API** — 방 번호가 아닌 좌표(lng, lat, level)로 경로를 요청한다. 방 검색/자동완성은 프론트엔드가 GeoJSON에서 로컬 처리한다.
 3. **경로 응답에 영상 정보 포함** — 백엔드가 다익스트라, 수선의 발, 영상 시간 계산을 모두 처리하고, 프론트엔드는 영상 클립을 이어붙이기만 한다.
 4. **GeoJSON은 3D 모델링용** — 건물/방/벽 GeoJSON은 프론트엔드가 Three.js로 렌더링하는 데만 사용한다.
 
@@ -77,18 +77,27 @@ Content-Type: application/json
 
 ### 응답 (경로 있음)
 
+실제 로컬 실행 결과 예시 (23222호 3F → 23111호 1F):
+
 ```json
 {
   "found": true,
   "route": {
     "coordinates": [
-      [126.97652, 37.29412],
-      [126.97650, 37.29415],
-      [126.97648, 37.29418]
+      [126.976978, 37.2941731],
+      [126.97697317, 37.29419677],
+      [126.97697454, 37.29420933],
+      [126.97636762, 37.29427538],
+      [126.97636429, 37.29431458],
+      [126.97635587, 37.29432044],
+      [126.97633198, 37.29428274],
+      [126.97658637, 37.29425380],
+      [126.97658759, 37.29426459],
+      [126.9766083, 37.2943092]
     ],
-    "levels": [3, 3, 3, 2, 1, 1, 1, 1],
-    "totalDistance": 142.5,
-    "estimatedTime": "약 2분",
+    "levels": [3, 3, 3, 3, 3, 1, 1, 1, 1, 1],
+    "totalDistance": 98,
+    "estimatedTime": "1분",
     "startLevel": 3,
     "endLevel": 1
   },
@@ -96,63 +105,63 @@ Content-Type: application/json
     "clips": [
       {
         "index": 0,
-        "videoFile": "eng1_c_F3_9_cw.mp4",
-        "videoStart": 12.45,
-        "videoEnd": 47.91,
-        "duration": 35.46,
-        "yaw": 195.47,
+        "videoFile": "eng1_c_F3_9_ccw.mp4",
+        "videoStart": 12.94,
+        "videoEnd": 50.78,
+        "duration": 37.85,
+        "yaw": 0,
         "level": 3,
         "isExitClip": false,
         "coordStartIdx": 2,
-        "coordEndIdx": 5,
-        "routeDistStart": 3.2,
-        "routeDistEnd": 78.5
+        "coordEndIdx": 3,
+        "routeDistStart": 4.07,
+        "routeDistEnd": 58.26
       },
       {
         "index": 1,
-        "videoFile": "eng1_s_3_3ed.mp4",
+        "videoFile": "eng1_e_1_3e.mp4",
         "videoStart": 0,
-        "videoEnd": 4,
-        "duration": 4,
-        "yaw": 179.6,
+        "videoEnd": 3,
+        "duration": 3,
+        "yaw": 113.2,
         "level": 3,
         "isExitClip": false,
-        "coordStartIdx": 5,
-        "coordEndIdx": 6,
-        "routeDistStart": 78.5,
-        "routeDistEnd": 78.5
+        "coordStartIdx": 4,
+        "coordEndIdx": 4,
+        "routeDistStart": 62.63,
+        "routeDistEnd": 62.63
       },
       {
         "index": 2,
-        "videoFile": "eng1_s_3_1od.mp4",
+        "videoFile": "eng1_e_1_1o.mp4",
         "videoStart": 0,
-        "videoEnd": 4,
-        "duration": 4,
-        "yaw": 356.53,
+        "videoEnd": 3,
+        "duration": 3,
+        "yaw": 247.47,
         "level": 1,
         "isExitClip": true,
-        "coordStartIdx": 6,
-        "coordEndIdx": 6,
-        "routeDistStart": 78.5,
-        "routeDistEnd": 78.5
+        "coordStartIdx": 5,
+        "coordEndIdx": 5,
+        "routeDistStart": 63.62,
+        "routeDistEnd": 63.62
       },
       {
         "index": 3,
-        "videoFile": "eng1_c_F1_1_cw.mp4",
+        "videoFile": "eng1_c_F1_3_ccw.mp4",
         "videoStart": 0,
-        "videoEnd": 25.3,
-        "duration": 25.3,
-        "yaw": 187.07,
+        "videoEnd": 15.18,
+        "duration": 15.18,
+        "yaw": 184.93,
         "level": 1,
         "isExitClip": false,
         "coordStartIdx": 6,
-        "coordEndIdx": 9,
-        "routeDistStart": 78.5,
-        "routeDistEnd": 142.5
+        "coordEndIdx": 7,
+        "routeDistStart": 68.31,
+        "routeDistEnd": 91.04
       }
     ],
     "videoStartCoordIdx": 2,
-    "videoEndCoordIdx": 9
+    "videoEndCoordIdx": 7
   }
 }
 ```
@@ -245,53 +254,12 @@ Body: 영상 바이트 데이터
 
 ---
 
-## 4. GET /api/rooms/search
+## 방 검색 (프론트엔드 처리)
 
-방 번호/이름으로 검색 (자동완성용). centroid 좌표를 포함하여 반환.
+방 검색/자동완성은 **백엔드 API가 아닌 프론트엔드에서 처리**한다.
+프론트엔드가 앱 시작 시 GeoJSON 파일을 로드하면 방 번호(ref), 이름(name), 유형(room_type), 중심 좌표(centroid)를 이미 보유하므로 별도 API 없이 로컬에서 검색한다.
 
-### 요청
-
-```
-GET /api/rooms/search?q=213
-```
-
-| 파라미터 | 타입 | 설명 |
-|----------|------|------|
-| `q` | string | 검색어 (부분 매칭) |
-
-### 응답
-
-```json
-[
-  {
-    "building": "eng1",
-    "ref": "21301",
-    "name": "일반물리학실험실",
-    "level": 3,
-    "roomType": "lab",
-    "centroid": [126.97652, 37.29412]
-  },
-  {
-    "building": "eng1",
-    "ref": "21302",
-    "name": "",
-    "level": 3,
-    "roomType": "classroom",
-    "centroid": [126.97656, 37.29415]
-  }
-]
-```
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `building` | `string` | 건물 코드 |
-| `ref` | `string` | 방 번호 |
-| `name` | `string` | 방 이름 (없으면 `""`) |
-| `level` | `number` | 층 번호 |
-| `roomType` | `string` | 방 유형: `"classroom"`, `"lab"`, `"office"`, `"facility"` 등 |
-| `centroid` | `[number,number]` | 방 중심 좌표 `[경도, 위도]` — 경로 API에 바로 사용 가능 |
-
-> 사용자가 방을 선택하면, `centroid` 좌표를 `POST /api/route`의 `from` 또는 `to`에 넣어 호출한다.
+사용자가 방을 선택하면, GeoJSON에서 가져온 centroid 좌표를 `POST /api/route`의 `from` 또는 `to`에 넣어 호출한다.
 
 ---
 
@@ -301,7 +269,7 @@ GET /api/rooms/search?q=213
 |----------|------|------|
 | `GET /api/graph` | **삭제** | 프론트엔드에 그래프 데이터를 전달하지 않음 |
 | `GET /api/route?from=방번호&to=방번호` | **대체** | `POST /api/route` (좌표 기반)으로 대체 |
-| `GET /api/nodes/search` | **대체** | `GET /api/rooms/search`로 대체 (centroid 포함) |
+| `GET /api/nodes/search` | **삭제** | 프론트엔드가 GeoJSON에서 로컬 검색 처리 |
 
 ---
 

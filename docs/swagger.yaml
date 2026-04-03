@@ -20,8 +20,6 @@ servers:
 tags:
   - name: Route
     description: 좌표 기반 경로 탐색
-  - name: Rooms
-    description: 방 검색 (자동완성)
   - name: GeoJSON
     description: 건물/층별 GeoJSON 데이터 (3D 모델링용)
   - name: Videos
@@ -67,34 +65,78 @@ paths:
               examples:
                 found:
                   summary: 경로 있음
+                  description: "실제 로컬 실행 결과 (23222호 3F → 23111호 1F)"
                   value:
                     found: true
                     route:
                       coordinates:
-                        - [126.97652, 37.29412]
-                        - [126.97650, 37.29415]
-                        - [126.97648, 37.29418]
-                      levels: [3, 3, 3, 2, 1, 1, 1, 1]
-                      totalDistance: 142.5
-                      estimatedTime: "약 2분"
+                        - [126.976978, 37.2941731]
+                        - [126.97697317, 37.29419677]
+                        - [126.97697454, 37.29420933]
+                        - [126.97636762, 37.29427538]
+                        - [126.97636429, 37.29431458]
+                        - [126.97635587, 37.29432044]
+                        - [126.97633198, 37.29428274]
+                        - [126.97658637, 37.29425380]
+                        - [126.97658759, 37.29426459]
+                        - [126.9766083, 37.2943092]
+                      levels: [3, 3, 3, 3, 3, 1, 1, 1, 1, 1]
+                      totalDistance: 98
+                      estimatedTime: "1분"
                       startLevel: 3
                       endLevel: 1
                     walkthrough:
                       clips:
                         - index: 0
-                          videoFile: "eng1_c_F3_9_cw.mp4"
-                          videoStart: 12.45
-                          videoEnd: 47.91
-                          duration: 35.46
-                          yaw: 195.47
+                          videoFile: "eng1_c_F3_9_ccw.mp4"
+                          videoStart: 12.94
+                          videoEnd: 50.78
+                          duration: 37.85
+                          yaw: 0
                           level: 3
                           isExitClip: false
                           coordStartIdx: 2
+                          coordEndIdx: 3
+                          routeDistStart: 4.07
+                          routeDistEnd: 58.26
+                        - index: 1
+                          videoFile: "eng1_e_1_3e.mp4"
+                          videoStart: 0
+                          videoEnd: 3
+                          duration: 3
+                          yaw: 113.2
+                          level: 3
+                          isExitClip: false
+                          coordStartIdx: 4
+                          coordEndIdx: 4
+                          routeDistStart: 62.63
+                          routeDistEnd: 62.63
+                        - index: 2
+                          videoFile: "eng1_e_1_1o.mp4"
+                          videoStart: 0
+                          videoEnd: 3
+                          duration: 3
+                          yaw: 247.47
+                          level: 1
+                          isExitClip: true
+                          coordStartIdx: 5
                           coordEndIdx: 5
-                          routeDistStart: 3.2
-                          routeDistEnd: 78.5
+                          routeDistStart: 63.62
+                          routeDistEnd: 63.62
+                        - index: 3
+                          videoFile: "eng1_c_F1_3_ccw.mp4"
+                          videoStart: 0
+                          videoEnd: 15.18
+                          duration: 15.18
+                          yaw: 184.93
+                          level: 1
+                          isExitClip: false
+                          coordStartIdx: 6
+                          coordEndIdx: 7
+                          routeDistStart: 68.31
+                          routeDistEnd: 91.04
                       videoStartCoordIdx: 2
-                      videoEndCoordIdx: 9
+                      videoEndCoordIdx: 7
                 notFound:
                   summary: 경로 없음
                   value:
@@ -109,58 +151,23 @@ paths:
               example:
                 error: "Invalid coordinates: level must be an integer"
 
-  /api/rooms/search:
-    get:
-      tags: [Rooms]
-      summary: 방 번호/이름 검색 (자동완성)
-      description: |
-        방 번호, 이름, 유형으로 부분 매칭 검색.
-        결과에 centroid 좌표가 포함되어 바로 경로 API에 사용할 수 있다.
-      parameters:
-        - name: q
-          in: query
-          required: true
-          description: 검색어 (부분 매칭)
-          schema:
-            type: string
-          example: "213"
-      responses:
-        '200':
-          description: 검색 결과
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RoomSearchResult'
-              example:
-                - building: "eng1"
-                  ref: "21301"
-                  name: "일반물리학실험실"
-                  level: 3
-                  roomType: "lab"
-                  centroid: [126.97652, 37.29412]
-                - building: "eng1"
-                  ref: "21302"
-                  name: ""
-                  level: 3
-                  roomType: "classroom"
-                  centroid: [126.97656, 37.29415]
-
   /api/geojson/{path}:
     get:
       tags: [GeoJSON]
       summary: GeoJSON 파일 서빙
       description: |
         건물/층별 GeoJSON 파일을 서빙한다. 프론트엔드가 Three.js 3D 모델 렌더링에 사용.
+        `public/geojson/` 폴더의 파일을 그대로 서빙하면 된다.
 
-        **파일 종류:**
-        - `buildings.json` — 건물 목록
-        - `{building}/manifest.json` — 건물 메타데이터 (이름, 층 목록)
-        - `{building}/{building}_outline.geojson` — 건물 외곽선
-        - `{building}/{building}_room_L{level}.geojson` — 방 폴리곤
-        - `{building}/{building}_wall_L{level}.geojson` — 벽 폴리곤
-        - `{building}/{building}_collider_L{level}.geojson` — 충돌 폴리곤
+        **파일 종류 및 응답 형식:**
+        - `buildings.json` → `string[]` (건물 코드 배열, 예: `["eng1"]`)
+        - `{building}/manifest.json` → `{ building, name, loc_ref, levels: number[] }`
+        - `{building}/{building}_outline.geojson` → GeoJSON FeatureCollection (Polygon)
+        - `{building}/{building}_room_L{level}.geojson` → GeoJSON FeatureCollection (Polygon/MultiPolygon, properties: ref, name, room_type, _centroid)
+        - `{building}/{building}_wall_L{level}.geojson` → GeoJSON FeatureCollection (Polygon)
+        - `{building}/{building}_collider_L{level}.geojson` → GeoJSON FeatureCollection (Polygon)
+
+        상세 구조: DATA_FORMAT.md 참조
       parameters:
         - name: path
           in: path
@@ -288,17 +295,22 @@ components:
     RouteResponse:
       type: object
       required: [found]
+      description: |
+        found=true일 때 route와 walkthrough가 반드시 포함된다.
+        found=false일 때는 error만 포함된다.
       properties:
         found:
           type: boolean
           description: 경로 존재 여부
         route:
           $ref: '#/components/schemas/RouteData'
+          description: "found=true일 때 필수"
         walkthrough:
           $ref: '#/components/schemas/WalkthroughData'
+          description: "found=true일 때 필수"
         error:
           type: string
-          description: 경로 없음 시 에러 메시지
+          description: "found=false일 때 에러 메시지"
 
     RouteData:
       type: object
@@ -410,40 +422,6 @@ components:
         routeDistEnd:
           type: number
           description: 경로 시작점으로부터의 누적 거리 (미터) — 클립 끝
-
-    RoomSearchResult:
-      type: object
-      required: [building, ref, name, level, roomType, centroid]
-      properties:
-        building:
-          type: string
-          description: 건물 코드
-          example: "eng1"
-        ref:
-          type: string
-          description: 방 번호
-          example: "21301"
-        name:
-          type: string
-          description: "방 이름 (없으면 빈 문자열)"
-          example: "일반물리학실험실"
-        level:
-          type: integer
-          description: 층 번호
-          example: 3
-        roomType:
-          type: string
-          description: "방 유형"
-          enum: [classroom, lab, office, restroom, stairs, elevator, facility, storage, store, club, lounge, dining, dormitory, reserved]
-          example: "lab"
-        centroid:
-          type: array
-          items:
-            type: number
-          minItems: 2
-          maxItems: 2
-          description: "방 중심 좌표 [경도, 위도] — POST /api/route에 바로 사용 가능"
-          example: [126.97652, 37.29412]
 
     ErrorResponse:
       type: object

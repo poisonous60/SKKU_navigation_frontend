@@ -41,11 +41,8 @@ export async function fetchRoute(from: RouteCoordinate, to: RouteCoordinate): Pr
   return LocalRoute.findRoute(from, to);
 }
 
-/** Search rooms by query string */
+/** Search rooms by query string (always local — GeoJSON already loaded) */
 export async function searchRooms(query: string): Promise<RoomListItem[]> {
-  if (useApi) {
-    return ApiRoute.searchRooms(query);
-  }
   return LocalRoute.searchRooms(query);
 }
 

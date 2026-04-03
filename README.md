@@ -120,7 +120,6 @@ npm run build  # dist/ 폴더에 번들 생성
 | `POST` | `/api/route` | 좌표→좌표 경로 탐색 (경로 좌표 + 영상 클립 반환) |
 | `GET` | `/api/geojson/...` | 건물/층별 GeoJSON 데이터 (3D 모델링용) |
 | `GET` | `/api/videos/{filename}` | 360° 영상 스트리밍 (HTTP Range 지원) |
-| `GET` | `/api/rooms/search?q=` | 방 번호/이름 검색 (centroid 좌표 포함) |
 
 > 전체 API 문서: [docs/BACKEND_API.md](docs/BACKEND_API.md)
 
@@ -152,7 +151,7 @@ src/services/
 |------|-----------|----------|------|
 | 경로 탐색 | ✅ 자체 Dijkstra | ✅ POST /api/route | 좌표 기반, 동일한 ApiRouteResult 출력 |
 | 영상 클립 계산 | ✅ 로컬 clip builder | ✅ 백엔드에서 계산 | yaw, 시간, 계단/엘리베이터 포함 |
-| 방 검색 | ✅ GeoJSON 기반 | ✅ /api/rooms/search | API: centroid 좌표 포함 |
+| 방 검색 | ✅ GeoJSON 기반 | ✅ GeoJSON 기반 | 항상 로컬 처리 (백엔드 API 불필요) |
 | GeoJSON 서빙 | ✅ 로컬 /geojson/ | ✅ /api/geojson/... | `setGeojsonBase()`로 전환 |
 | 영상 서빙 | ✅ 로컬 /videos/ | ✅ /api/videos/ | `setVideoBase()`로 전환 |
 
